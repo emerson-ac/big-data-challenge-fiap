@@ -8,21 +8,23 @@
 
 Sistema de recomendação de produtos para e-commerce baseado em comportamento de navegação e compra de usuários. Implementa uma rede neural (MLP com embeddings) em PyTorch, comparada com baselines de Scikit-Learn, rastreamento via MLflow e versionamento de dados com DVC.
 
-**Dataset:** [Instacart Online Grocery Basket Analysis](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset) (~50 milhões de interações, +3 milhões de usuários)
+**Dataset:** [Instacart Online Grocery Basket Analysis](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset) (~3,4 milhões de pedidos, ~206 mil usuários, ~34 milhões de interações pedido-produto)
 
 ---
 
 ## Requisitos Obrigatórios
 
-✅ **Estrutura:** Diretórios `src/`, `tests/`, `data/`, `models/`, `configs/`  
-✅ **Código:** Funções ≤ 20 linhas, type hints, docstrings Google Style  
-✅ **Padrões:** Implementação de Design Patterns (Factory, Strategy)  
-✅ **Ambiente:** Gerenciamento via `pyproject.toml` e `uv`  
-✅ **ML:** Modelo PyTorch + Baselines Scikit-Learn, 4+ métricas  
-✅ **MLOps:** Docker, DVC (3+ estágios), MLflow Tracking + Registry  
-✅ **Qualidade:** Ruff linting, pre-commit hooks, commits semânticos  
+Status atual: **Etapa 1 (Clean Code e Estrutura)** em andamento.
 
-Ver [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) para lista completa.
+- [x] **Estrutura:** Diretórios `src/`, `tests/`, `data/`, `models/`, `configs/`
+- [ ] **Código:** Funções ≤ 20 linhas, type hints, docstrings Google Style
+- [ ] **Padrões:** Implementação de Design Patterns (Factory, Strategy)
+- [ ] **Ambiente:** Dependências de prod/dev (pytorch, sklearn, mlflow, dvc) via `pyproject.toml` e `uv`
+- [ ] **ML:** Modelo PyTorch + Baselines Scikit-Learn, 4+ métricas
+- [ ] **MLOps:** Docker, DVC (3+ estágios), MLflow Tracking + Registry
+- [ ] **Qualidade:** Ruff linting, pre-commit hooks, commits semânticos
+
+Ver [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) para o checklist completo e atualizado.
 
 ---
 

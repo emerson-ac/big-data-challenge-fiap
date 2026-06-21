@@ -5,7 +5,7 @@ Para detalhes, leia os arquivos referenciados em docs/.
 
 <important>
 - RANDOM_SEED = 42 em todo código. Nunca use random/numpy/torch sem fixar seed.
-- Proibido usar print() no código da API. Use structlog em todos os módulos src/.
+- Proibido usar print() em qualquer módulo de src/. Use structlog. Prints são permitidos em notebooks.
 - Linting (ruff) deve passar sem erros antes de qualquer commit.
 - Validação cruzada sempre estratificada (StratifiedKFold).
 - Todo experimento MLflow deve registrar: params, métricas, dataset hash e artefatos.
@@ -34,7 +34,7 @@ Sistema de recomendação de produtos para um e-commerce, baseado no comportamen
 
 - **Estrutura de Diretórios**: O projeto deve obrigatoriamente conter as pastas src/, tests/, data/, models/ e configs/.  
 - **Qualidade de Código**: As funções devem ter no máximo 20 linhas.  
-- **Tipagem e Documentação: Uso obrigatório de type hints em todas as funções públicas e docstrings no padrão Google style.  
+- **Tipagem e Documentação**: Uso obrigatório de type hints em todas as funções públicas e docstrings no padrão Google style.  
 - **Linting e Hooks**: Configuração do Ruff sem erros e utilização de pre-commit hooks.  
 - **Design Patterns**: Implementação de pelo menos um padrão de projeto, como Factory (para criar modelos), Strategy (para pré-processadores) ou Template Method.  
 - **Ambiente Isolado**: Separação clara entre dependências de produção e desenvolvimento, com o lock file comitado e configurações externalizadas via .env.  

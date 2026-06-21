@@ -218,7 +218,7 @@ notebooks/
 
 **Notas:**
 - Todos os notebooks devem ter RANDOM_SEED = 42 fixado
-- Nenhum notebook deve conter print(); usar logging via structlog
+- print() é permitido em notebooks para uso exploratório; em código movido para src/ usar structlog
 - Cada notebook deve ter uma célula de configuração inicial (imports, seed, logging)
 - Outputs devem ser salvos de forma versionada (com timestamp ou git hash)
 
@@ -265,7 +265,7 @@ notebooks/
 - [ ] Seed fixado (RANDOM_SEED = 42)
 - [ ] Imports organizados e comentados
 - [ ] Logging estruturado via structlog
-- [ ] Sem uso de print()
+- [ ] print() restrito a uso exploratório (código movido para src/ usa structlog)
 - [ ] Tipo hints em funções customizadas
 - [ ] Docstrings em padrão Google Style
 - [ ] Outputs salvos com versionagem
