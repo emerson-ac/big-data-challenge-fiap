@@ -1,0 +1,50 @@
+random_seed: 42
+
+preprocessing:
+  top_n_products: 3000
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+evaluation:
+  k: 10
+
+item_based_cf:
+  search:
+    enabled: true
+    n_trials: 4
+    top_m_choices: [50, 100, 300, 3000]
+
+user_based_cf:
+  n_neighbors: 20
+  neighbor_pool_size: 20000
+  eval_sample_size: 3000
+  search:
+    enabled: true
+    n_trials: 4
+    n_neighbors_choices: [10, 20, 30, 50]
+
+matrix_factorization:
+  n_components: 50
+  search:
+    enabled: true
+    n_trials: 4
+    n_components_choices: [20, 50, 100, 150]
+
+ncf:
+  embedding_dim: 32
+  hidden_dims: [128, 64, 32]
+  negative_ratio: 4
+  learning_rate: 0.005
+  batch_size: 16384
+  epochs: 15
+  early_stopping_patience: 4
+  val_sample_size: 1500
+  search:
+    enabled: true
+    n_trials: 4
+    search_epochs: 5
+    search_early_stopping_patience: 2
+    learning_rate_choices: [0.001, 0.003, 0.005, 0.01]
+    embedding_dim_choices: [16, 32, 64]
+    hidden_dims_choices: [[64, 32], [128, 64, 32], [256, 128, 64]]
