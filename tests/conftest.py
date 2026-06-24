@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
+from src.models.inference import RecommendationEngine
+
 
 @pytest.fixture
 def toy_similarity() -> sp.csr_matrix:
@@ -72,3 +74,14 @@ def model_artifacts(
         "popularity_path": popularity_path,
         "vocab_path": vocab_path,
     }
+
+
+@pytest.fixture
+def engine(model_artifacts: dict) -> RecommendationEngine:
+    """RecommendationEngine real, carregado a partir dos artefatos sintéticos."""
+    return RecommendationEngine(
+        similarity_path=model_artifacts["similarity_path"],
+        interactions_path=model_artifacts["interactions_path"],
+        popularity_path=model_artifacts["popularity_path"],
+        vocab_path=model_artifacts["vocab_path"],
+    )
