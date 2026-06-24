@@ -1,0 +1,71 @@
+{
+  "k": 10,
+  "params": {
+    "embedding_dim": 64,
+    "hidden_dims": [
+      256,
+      128,
+      64
+    ],
+    "learning_rate": 0.003,
+    "negative_ratio": 4,
+    "batch_size": 16384
+  },
+  "search_results": [
+    {
+      "learning_rate": 0.001,
+      "embedding_dim": 64,
+      "hidden_dims": [
+        128,
+        64,
+        32
+      ],
+      "best_val_recall_at_k": 0.09394810984362817,
+      "epochs_run": 5
+    },
+    {
+      "learning_rate": 0.001,
+      "embedding_dim": 16,
+      "hidden_dims": [
+        128,
+        64,
+        32
+      ],
+      "best_val_recall_at_k": 0.09418451205797157,
+      "epochs_run": 5
+    },
+    {
+      "learning_rate": 0.003,
+      "embedding_dim": 64,
+      "hidden_dims": [
+        256,
+        128,
+        64
+      ],
+      "best_val_recall_at_k": 0.09504205723194627,
+      "epochs_run": 5
+    },
+    {
+      "learning_rate": 0.003,
+      "embedding_dim": 64,
+      "hidden_dims": [
+        64,
+        32
+      ],
+      "best_val_recall_at_k": 0.09365094898361902,
+      "epochs_run": 4
+    }
+  ],
+  "validation": {
+    "precision_at_k": 0.07628289647170508,
+    "recall_at_k": 0.09356690732039921,
+    "ndcg_at_k": 0.11124731301463749,
+    "map_at_k": 0.053077835419865486
+  },
+  "test": {
+    "precision_at_k": 0.07498154203143129,
+    "recall_at_k": 0.09295480410802218,
+    "ndcg_at_k": 0.10930593828320431,
+    "map_at_k": 0.05185015444854515
+  }
+}

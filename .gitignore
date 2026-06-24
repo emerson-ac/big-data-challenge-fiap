@@ -58,7 +58,6 @@ data/processed/
 models/**/*.pt
 models/**/*.pkl
 models/**/*.joblib
-!models/.gitkeep
 
 # MLflow
 mlruns/
@@ -71,6 +70,7 @@ mlruns/
 # Notebooks
 .ipynb_checkpoints/
 *.ipynb_checkpoints/
+notebooks/outputs/
 
 # Logs
 logs/
