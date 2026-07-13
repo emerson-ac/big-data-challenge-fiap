@@ -9,8 +9,8 @@ stages:
       size: 985
     - path: data/raw
       hash: md5
-      md5: d743f9dddc66cb960ac927ccafeb84bf.dir
-      size: 172948
+      md5: 7a09b53c182ed1f42c7b2e8727ecb5d8.dir
+      size: 242789
       nfiles: 4
     - path: src/config.py
       hash: md5
@@ -27,28 +27,28 @@ stages:
     outs:
     - path: data/processed/interactions_prior.npz
       hash: md5
-      md5: d8f96d90b627ec506b58b55d1028f5c9
-      size: 9707
+      md5: 117f949ab71d7209449bf55a067fbf67
+      size: 15182
     - path: data/processed/split_meta.json
       hash: md5
-      md5: 480f2b58495e4da1b14d526434cc2ff0
+      md5: f25b7982d699758845c23a7c7d6c141f
       size: 254
     - path: data/processed/test_pairs.pkl
       hash: md5
-      md5: 19186a0d12d2a2614a951b0b03c7c2ca
-      size: 3714
+      md5: 41401980be525717deca9e5153d0f3a4
+      size: 4706
     - path: data/processed/train_pairs.pkl
       hash: md5
-      md5: a641eb462c26ed7c4aaac7ef776a68ad
-      size: 13252
+      md5: f53d2d1ce75ab2b5a13e889ade03a6fa
+      size: 17812
     - path: data/processed/val_pairs.pkl
       hash: md5
-      md5: af001ed125b22c63e8879ba58029b1cb
-      size: 3538
+      md5: 32df932dd70f2704cc9ec7c6eef03bb4
+      size: 4836
     - path: data/processed/vocabularies.pkl
       hash: md5
-      md5: 4e486a883493534fd0a39ad6b3179d6c
-      size: 10035
+      md5: c0dbd003d03601a03f58397bb5c307ae
+      size: 14196
   train:
     cmd: python -m src.pipeline.train
     deps:
@@ -58,8 +58,8 @@ stages:
       size: 985
     - path: data/processed
       hash: md5
-      md5: 151ebb836f8966596f04cee33cf27e48.dir
-      size: 40500
+      md5: 8eddb73de607c3788e21d9c7c2f01c80.dir
+      size: 56986
       nfiles: 6
     - path: src/evaluation
       hash: md5
@@ -72,7 +72,7 @@ stages:
       size: 2663
     - path: src/models/training
       hash: md5
-      md5: bbffe44806ee23d5667aebf74fdabed8.dir
+      md5: 4f45b1051cca44939d237be842b0bf5b.dir
       size: 62503
       nfiles: 14
     - path: src/pipeline/train.py
@@ -82,75 +82,75 @@ stages:
     outs:
     - path: models/baseline_popularity/metrics.json
       hash: md5
-      md5: d6e2443a6de361bb78b422a077dbc903
-      size: 366
+      md5: 4f1e77a890040c6b405cd401ea5fc90b
+      size: 362
     - path: models/baseline_popularity/ranking.pkl
       hash: md5
-      md5: 75a39d1bbb0aa5eb094090e6790df349
-      size: 1751
+      md5: 94054f7dfe02297ab3fd591b98bf46c3
+      size: 2552
     - path: models/item_based_cf/item_similarity.npz
       hash: md5
-      md5: e640fde0800cd3213aaf8bd207a1fe26
-      size: 33762
+      md5: 2ffb036a08eea840e86ddc7a4058d495
+      size: 49881
     - path: models/item_based_cf/metrics.json
       hash: md5
-      md5: fe7b090ca0d609778ae016a5f1fc2333
-      size: 1190
+      md5: 37eb0890f3ad0ea26dda1b4175316e13
+      size: 1192
     - path: models/matrix_factorization/item_factors.npy
       hash: md5
-      md5: 218613c2c90a6cc0964e4cfa5a2bd4c9
-      size: 16128
+      md5: 03bbb927f0aadc029cca81940f601d19
+      size: 24128
     - path: models/matrix_factorization/metrics.json
       hash: md5
-      md5: f58f6c9e1bad7cd4be9116723668f69b
-      size: 1275
+      md5: 62f1e1210a479279e75541299aba3975
+      size: 1278
     - path: models/matrix_factorization/user_factors.npy
       hash: md5
-      md5: 801ef64a85dc95cd3b61f7a84679bab1
-      size: 20528
+      md5: 5fb5ba7b89d21fe35c502ada4d2a836d
+      size: 27328
     - path: models/neural_network/metrics.json
       hash: md5
-      md5: 831ae8c0ba32ef7fb288ec8d6f76c235
+      md5: 1eb0a4d5a0e3c0cbf2d5fe2083073557
       size: 1403
     - path: models/neural_network/model.pt
       hash: md5
-      md5: c252e2634ce36d145eaede4cc2f6c8fd
-      size: 417125
+      md5: 887d6a1e9e4b522e47e4a1f0a29faae2
+      size: 464485
     - path: models/neural_network/training_history.pkl
       hash: md5
-      md5: cc1c72a2758059ba59d98f78bd9a6336
-      size: 898
+      md5: d075147b459e68ddbef1c4dc74f76b3d
+      size: 1024
     - path: models/user_based_cf/knn_model.pkl
       hash: md5
-      md5: e0c65a16c72beaf7d7ba0ceb5eabb961
-      size: 47488
+      md5: b9d31f23b36af28e8554e2092b049bda
+      size: 69642
     - path: models/user_based_cf/metrics.json
       hash: md5
-      md5: 0f0de75f4fd0eb234183ae4b43cdc191
-      size: 1279
+      md5: 4ed17ec95b1e81ace38d1568f076078c
+      size: 1273
   evaluate:
     cmd: python -m src.pipeline.evaluate
     deps:
     - path: models/baseline_popularity/ranking.pkl
       hash: md5
-      md5: 75a39d1bbb0aa5eb094090e6790df349
-      size: 1751
+      md5: 94054f7dfe02297ab3fd591b98bf46c3
+      size: 2552
     - path: models/item_based_cf/item_similarity.npz
       hash: md5
-      md5: e640fde0800cd3213aaf8bd207a1fe26
-      size: 33762
+      md5: 2ffb036a08eea840e86ddc7a4058d495
+      size: 49881
     - path: models/matrix_factorization/user_factors.npy
       hash: md5
-      md5: 801ef64a85dc95cd3b61f7a84679bab1
-      size: 20528
+      md5: 5fb5ba7b89d21fe35c502ada4d2a836d
+      size: 27328
     - path: models/neural_network/model.pt
       hash: md5
-      md5: c252e2634ce36d145eaede4cc2f6c8fd
-      size: 417125
+      md5: 887d6a1e9e4b522e47e4a1f0a29faae2
+      size: 464485
     - path: models/user_based_cf/knn_model.pkl
       hash: md5
-      md5: e0c65a16c72beaf7d7ba0ceb5eabb961
-      size: 47488
+      md5: b9d31f23b36af28e8554e2092b049bda
+      size: 69642
     - path: src/models/ncf.py
       hash: md5
       md5: 29b5c37f70b6e57e48e5d5e92f53ffad
@@ -166,9 +166,9 @@ stages:
     outs:
     - path: models/MODEL_CARD.md
       hash: md5
-      md5: c3b07736da311d5268e1bbbbb9c64d2a
-      size: 1643
+      md5: c000aaf51b19b19d754743d0a5eb95ad
+      size: 1640
     - path: models/evaluation/metrics_comparison.csv
       hash: md5
-      md5: 3f6b270b85216f8cb20d82d7fae457a5
-      size: 447
+      md5: e720b35f727df611704c25a3d0646290
+      size: 448
