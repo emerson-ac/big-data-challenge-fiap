@@ -14,16 +14,16 @@ stages:
       nfiles: 4
     - path: src/config.py
       hash: md5
-      md5: c70a7cb94c5736e8639951a313b9e594
-      size: 4104
+      md5: 6b295749263abcac82b95e71106b1f70
+      size: 3771
     - path: src/pipeline/common.py
       hash: md5
-      md5: 16d187a0dd6e4dd4fad0be8d21ffdb4c
-      size: 1927
+      md5: e6d4c7e04ed9d218d38aed3e9d710e32
+      size: 1253
     - path: src/pipeline/preprocess.py
       hash: md5
-      md5: 7cd5ef83943e2299ce443f746bb5bfc7
-      size: 11607
+      md5: f6fa456b063284eac0da70a84d144409
+      size: 10818
     outs:
     - path: data/processed/interactions_prior.npz
       hash: md5
@@ -77,8 +77,8 @@ stages:
       nfiles: 14
     - path: src/pipeline/train.py
       hash: md5
-      md5: 8a41d20ecc74cd717c1fcdec004cdbfb
-      size: 3171
+      md5: 7cbf61dc441aa0121d82e5a3fe10ac32
+      size: 2345
     outs:
     - path: models/baseline_popularity/metrics.json
       hash: md5
@@ -155,28 +155,20 @@ stages:
       hash: md5
       md5: 29b5c37f70b6e57e48e5d5e92f53ffad
       size: 2663
-    - path: src/models/registry_recommender.py
-      hash: md5
-      md5: 834085169b60ac546f045242dc0fb814
-      size: 1711
     - path: src/models/training/user_cf.py
       hash: md5
       md5: 14549e34428c252224c9812bebbabd13
       size: 5260
     - path: src/pipeline/evaluate.py
       hash: md5
-      md5: 0c2cf65865a3470cb4a6c4f550e02057
-      size: 9544
-    - path: src/serving/pyfunc.py
-      hash: md5
-      md5: d1be6932a14e93bef33af32d56c63d83
-      size: 2373
+      md5: 8db54d4a795dcdbc3de636335df432be
+      size: 7776
     outs:
     - path: models/MODEL_CARD.md
       hash: md5
-      md5: f3279591f1741b53220de91f3a6cdeaf
-      size: 1722
+      md5: 9f55fea8f8f3ca205d5ee2b4147922cd
+      size: 1640
     - path: models/evaluation/metrics_comparison.csv
       hash: md5
-      md5: 223bc5b0578c9b48b08d8b6265f1bbd1
-      size: 446
+      md5: 9d31db2829a9c922d27e991ffab8cb1a
+      size: 448
