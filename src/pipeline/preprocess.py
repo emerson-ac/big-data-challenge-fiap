@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 import structlog
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import train_test_split
 
 from src.config import get_settings
 from src.pipeline.common import compute_dataset_hash, load_config, set_seed
@@ -112,19 +112,10 @@ def segment_users(orders_per_user: pd.Series) -> pd.Series:
     return pd.cut(orders_per_user, bins=bins, labels=labels, include_lowest=True)
 
 
-def _folds_for_ratio(test_ratio: float) -> int:
-    """Calculates the number of StratifiedKFold splits from the test ratio."""
-    return max(3, int(round(1.0 / test_ratio)))
-
-
 def split_users(
     eval_users: np.ndarray, segments: pd.Series, cfg: dict, seed: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Splits users into train/val/test via StratifiedKFold (stratified CV).
-
-    Uses StratifiedKFold to ensure each split preserves the segment
-    distribution. Folds are assigned proportionally: last fold = test,
-    second-to-last = val, rest = train.
+    """Splits users into train/val/test, stratified by segment.
 
     Args:
         eval_users: Evaluable users (with a label).
@@ -135,16 +126,16 @@ def split_users(
     Returns:
         Tuple (train_users, val_users, test_users).
     """
-    n_splits = _folds_for_ratio(cfg["test_ratio"])
-    seg = segments.loc[eval_users].values
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    folds = [
-        eval_users[test_idx]
-        for _, test_idx in skf.split(np.zeros(len(eval_users)), seg)
-    ]
-    test_users = folds[-1]
-    val_users = folds[-2]
-    train_users = np.concatenate(folds[:-2])
+    train_users, rest = train_test_split(
+        eval_users,
+        train_size=cfg["train_ratio"],
+        random_state=seed,
+        stratify=segments.loc[eval_users],
+    )
+    val_frac = cfg["val_ratio"] / (cfg["val_ratio"] + cfg["test_ratio"])
+    val_users, test_users = train_test_split(
+        rest, train_size=val_frac, random_state=seed, stratify=segments.loc[rest]
+    )
     return train_users, val_users, test_users
 
 
