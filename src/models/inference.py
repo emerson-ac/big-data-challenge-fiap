@@ -76,6 +76,22 @@ class RecommendationEngine:
         self._vocab = load_vocabularies(vocab_path)
         logger.info("recommendation_engine_loaded", model_type=model_type)
 
+    def is_known_user(self, user_id: int) -> bool:
+        """Verifica se o usuário tem histórico conhecido pelo modelo treinado.
+
+        Args:
+            user_id: ID externo do usuário.
+
+        Returns:
+            True se o usuário existe no vocabulário de treino, False se é cold-start.
+        """
+        return user_id in self._vocab["user_id_to_idx"]
+
+    @property
+    def catalog_size(self) -> int:
+        """Número de produtos no catálogo conhecido pelo modelo."""
+        return len(self._vocab["idx_to_product_id"])
+
     def recommend(self, user_id: int, k: int = 10) -> list[Recommendation]:
         """Gera o top-k de recomendações para um usuário externo.
 
