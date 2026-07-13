@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import structlog
 
+from src.config import get_settings
 from src.evaluation.ranking import top_k_from_scores
 from src.models.model_loader import ModelFactory
 
@@ -48,6 +49,34 @@ def load_vocabularies(vocab_path: Path = DEFAULT_VOCAB_PATH) -> dict[str, Any]:
         return pickle.load(f)
 
 
+def _build_primary_model(
+    source: str, model_type: str, similarity_path: Path, interactions_path: Path
+) -> Any:
+    """Instantiates the primary model per the source (registry or local).
+
+    Args:
+        source: "registry" (MLflow) or "local" (disk artifacts).
+        model_type: Local model name registered in ModelFactory.
+        similarity_path: Path to item-item similarity (local mode).
+        interactions_path: Path to purchase history (local mode).
+
+    Returns:
+        Recommender with a ``score_user`` method.
+    """
+    if source == "registry":
+        settings = get_settings()
+        return ModelFactory.create(
+            "item_based_cf_registry",
+            name=settings.registered_model_name,
+            alias=settings.model_alias,
+        )
+    return ModelFactory.create(
+        model_type,
+        similarity_path=similarity_path,
+        interactions_path=interactions_path,
+    )
+
+
 class RecommendationEngine:
     """Orchestrates the Production model and the popularity fallback.
 
@@ -66,15 +95,15 @@ class RecommendationEngine:
         interactions_path: Path = DEFAULT_INTERACTIONS_PATH,
         popularity_path: Path = DEFAULT_POPULARITY_PATH,
         vocab_path: Path = DEFAULT_VOCAB_PATH,
+        model_source: str | None = None,
     ) -> None:
-        self._model = ModelFactory.create(
-            model_type,
-            similarity_path=similarity_path,
-            interactions_path=interactions_path,
+        source = model_source or get_settings().model_source
+        self._model = _build_primary_model(
+            source, model_type, similarity_path, interactions_path
         )
         self._fallback = ModelFactory.create("popularity", ranking_path=popularity_path)
         self._vocab = load_vocabularies(vocab_path)
-        logger.info("recommendation_engine_loaded", model_type=model_type)
+        logger.info("recommendation_engine_loaded", model_source=source)
 
     def is_known_user(self, user_id: int) -> bool:
         """Verifica se o usuário tem histórico conhecido pelo modelo treinado.

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
         config_path: Path to the YAML hyperparameter file.
         mlflow_tracking_uri: MLflow tracking server address.
         mlflow_experiment_name: Default MLflow experiment name.
+        registered_model_name: Name in the MLflow Model Registry.
+        model_alias: Alias for the promoted model (e.g. "production").
+        model_source: Where the API loads the model from ("local" or "registry").
     """
 
     model_config = SettingsConfigDict(
@@ -45,6 +48,9 @@ class Settings(BaseSettings):
     config_path: Path = Path("configs/model_config.yaml")
     mlflow_tracking_uri: str = "mlruns"
     mlflow_experiment_name: str = "tech-challenge-recsys"
+    registered_model_name: str = "item_based_cf_recommender"
+    model_alias: str = "production"
+    model_source: str = "local"
 
 
 @lru_cache(maxsize=1)

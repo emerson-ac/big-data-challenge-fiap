@@ -28,7 +28,8 @@ from src.evaluation.ranking import recommendations_from_score_matrix
 from src.models.ncf import NeuralCollaborativeFiltering, score_all_items
 from src.models.training.data import load_processed
 from src.models.training.user_cf import build_recommendations
-from src.pipeline.common import load_config, set_seed
+from src.pipeline.common import load_config, set_seed, setup_mlflow
+from src.serving.pyfunc import ItemBasedCFPyfunc, build_artifacts
 
 logger = structlog.get_logger()
 
@@ -172,6 +173,46 @@ def _write_model_card(
     out.write_text(card, encoding="utf-8")
 
 
+def _register(df, best, dataset_hash, settings) -> None:
+    """Logs comparison metrics and registers the best model as a pyfunc."""
+    import mlflow
+
+    setup_mlflow("model_comparison")
+    name = settings.registered_model_name
+    with mlflow.start_run(run_name="model_comparison_v1"):
+        mlflow.log_param("dataset_hash", dataset_hash)
+        mlflow.log_param("model_promoted_to_production", best)
+        for model, row in df.iterrows():
+            mlflow.log_metrics({f"{model}_{c}": float(v) for c, v in row.items()})
+        mlflow.log_artifact(
+            str(settings.models_dir / "evaluation" / "metrics_comparison.csv")
+        )
+        info = mlflow.pyfunc.log_model(
+            artifact_path="model",
+            python_model=ItemBasedCFPyfunc(),
+            artifacts=build_artifacts(settings.models_dir, settings.processed_data_dir),
+            registered_model_name=name,
+        )
+    _promote(name, info.registered_model_version, settings.model_alias)
+
+
+def _promote(name: str, version: str, alias: str) -> None:
+    """Promotes the model through Staging -> Production stages + alias."""
+    import mlflow
+
+    client = mlflow.tracking.MlflowClient()
+    client.transition_model_version_stage(name, version, "Staging")
+    client.transition_model_version_stage(name, version, "Production")
+    client.set_registered_model_alias(name, alias, version)
+    logger.info(
+        "model_promoted",
+        model=name,
+        version=version,
+        stages=["Staging", "Production"],
+        alias=alias,
+    )
+
+
 def main() -> None:
     """Runs the comparative evaluation and writes artifacts."""
     settings = get_settings()
@@ -189,6 +230,7 @@ def main() -> None:
     _write_model_card(
         df, best, data.split_meta["dataset_hash"], models_dir / "MODEL_CARD.md"
     )
+    _register(df, best, data.split_meta["dataset_hash"], settings)
     logger.info("evaluation_done", best_model=best)
 
 
@@ -205,7 +247,8 @@ Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash
 - NCF supera todos os baselines em recall@k: {beats_recall}
 - NCF supera todos os baselines em ndcg@k: {beats_ndcg}
 - Modelo com melhor recall@k: **{best}**
-- Promocao ao MLflow Model Registry ocorre na etapa de serving (Etapa 4).
+- `item_based_cf_recommender` promovido via stages Staging -> Production e
+  alias **@production** no MLflow Model Registry; os demais nao sao registrados.
 
 Gerado automaticamente por `src/pipeline/evaluate.py`.
 """
