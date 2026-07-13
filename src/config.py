@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     processed_data_dir: Path = Path("data/processed")
     models_dir: Path = Path("models")
     config_path: Path = Path("configs/model_config.yaml")
-    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_tracking_uri: str = "mlruns"
     mlflow_experiment_name: str = "tech-challenge-recsys"
 
 
