@@ -24,7 +24,7 @@ Sistema de recomendação de produtos para um e-commerce, baseado no comportamen
 
 - **Linguagem & Dependências**: Python com gerenciamento via pyproject.toml usando uv.  
 - **Modelagem**: PyTorch para a rede neural e Scikit-Learn para baselines e pré-processamento.
-- **Rastreamento & Registro**: MLflow para tracking de experimentos e Model Registry.
+- **Rastreamento & Registro**: MLflow (3.x) para tracking de experimentos e Model Registry. Servidor **externo** por padrão (`RECSYS_MLFLOW_TRACKING_URI`, ex.: `https://mlflow.pocsarcotech.com`); experimentos namespaced sob `recsys-instacart/*` e promoção do melhor modelo por **alias `@production`** (MLflow 3 não usa stages). Artefatos proxiados — sem credenciais AWS no cliente.
 - **Versionamento**: DVC para versionamento de dados e pipeline reprodutível.
 - **Infraestrutura**: Docker com Dockerfile multi-stage e docker-compose.yml. 
 

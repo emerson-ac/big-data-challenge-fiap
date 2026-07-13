@@ -1,0 +1,64 @@
+# eksctl ClusterConfig — declarativo e versionado.
+# Cria o cluster EKS reaproveitando a VPC/subnets existentes (argo-eks-vpc).
+# Aplicar com: eksctl create cluster -f cluster/cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: arcobridgegitops          # reaproveita as tags kubernetes.io/cluster/* já nas subnets
+  region: us-east-1
+  version: "1.32"
+  tags:
+    project: mlops-poc
+    managedBy: eksctl
+
+# VPC pré-existente (vpc-0b4cc706dabdbf20f). Não deixamos o eksctl criar rede nova.
+vpc:
+  id: vpc-0b4cc706dabdbf20f
+  subnets:
+    public:
+      us-east-1a: { id: subnet-039f9afa589601176 }   # argo-eks-subnet-public-1a
+      us-east-1b: { id: subnet-098fedb4b245a1aaa }   # argo-eks-subnet-public-1b
+    private:
+      us-east-1a: { id: subnet-0a3bdfc7d5a3719c0 }   # argo-eks-subnet-private-1a
+      us-east-1b: { id: subnet-08b0b6ad139386967 }   # argo-eks-subnet-private-1b
+
+# OIDC habilita IRSA (roles do LB Controller e do acesso ao S3 pelo KServe).
+iam:
+  withOIDC: true
+  serviceAccounts:
+    - metadata:
+        name: aws-load-balancer-controller
+        namespace: kube-system
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+    - metadata:
+        name: sa-model-s3
+        namespace: models              # o eksctl cria o namespace se não existir
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: aws-ebs-csi-driver
+  - name: metrics-server   # métricas de CPU/memória (kubectl top, HPA, autoscaling do KServe)
+
+# Nós nas subnets PÚBLICAS (privateNetworking: false) => sem NAT Gateway (economia).
+managedNodeGroups:
+  - name: ng-public
+    amiFamily: AmazonLinux2023
+    instanceType: t3.large
+    desiredCapacity: 2
+    minSize: 1
+    maxSize: 3
+    volumeSize: 30
+    privateNetworking: false
+    subnets:
+      - subnet-039f9afa589601176
+      - subnet-098fedb4b245a1aaa
+    labels:
+      role: worker
+    tags:
+      project: mlops-poc

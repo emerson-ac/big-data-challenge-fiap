@@ -1,0 +1,20 @@
+# Patch do ConfigMap inferenceservice-config (namespace default, onde o KServe roda).
+# Em RawDeployment usamos NOSSO Ingress ALB (models/*/ingress.yaml), então desabilitamos
+# a criação de ingress interno do KServe — que por padrão aponta para a classe "istio"
+# (inexistente aqui) e deixaria o InferenceService com Ready=False.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferenceservice-config
+  namespace: default
+data:
+  ingress: |
+    {
+      "ingressGateway": "knative-serving/knative-ingress-gateway",
+      "ingressClassName": "alb",
+      "ingressDomain": "example.com",
+      "domainTemplate": "{{ .Name }}-{{ .Namespace }}.{{ .IngressDomain }}",
+      "urlScheme": "http",
+      "disableIstioVirtualHost": true,
+      "disableIngressCreation": true
+    }

@@ -1,0 +1,28 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: sklearn-iris
+  namespace: models
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    serviceAccountName: sa-model-s3          # IRSA: leitura do bucket S3 do modelo
+    # Autoscaling via HPA (RawDeployment): escala por CPU. Sem estes campos o
+    # KServe fixa o HPA em 1/1 e nada escala. Teto 3 = maxSize do nodegroup.
+    minReplicas: 1
+    maxReplicas: 3
+    scaleMetric: cpu
+    scaleTarget: 80                          # % de uso de CPU alvo (usa o metrics-server)
+    model:
+      modelFormat:
+        name: sklearn
+      # Diretório no S3 contendo model.joblib (upload feito pelo deploy.sh)
+      storageUri: s3://arcobridgegitops-models-177300752486/sklearn-iris
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"

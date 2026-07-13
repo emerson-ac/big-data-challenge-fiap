@@ -1,0 +1,42 @@
+name: deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "platform/**"
+      - "models/**"
+      - "scripts/deploy.sh"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write     # necessário para OIDC (assumir role na AWS)
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      CLUSTER: arcobridgegitops
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}   # definido por scripts/setup-github-oidc.sh
+          aws-region: us-east-1
+
+      - uses: azure/setup-helm@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install scikit-learn joblib
+
+      - name: Deploy (platform + model)
+        run: bash scripts/deploy.sh

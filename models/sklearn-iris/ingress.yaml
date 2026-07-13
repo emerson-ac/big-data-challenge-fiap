@@ -1,0 +1,28 @@
+# Ingress ALB público para o predictor do InferenceService.
+# O AWS Load Balancer Controller cria um ALB internet-facing a partir daqui.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sklearn-iris
+  namespace: models
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /v1/models/sklearn-iris
+    # TLS: escuta 80 e 443; cert wildcard *.pocsarcotech.com no ACM (us-east-1)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:177300752486:certificate/eebc6271-527b-45a6-99b8-b7b888cdbdc2
+    alb.ingress.kubernetes.io/ssl-redirect: '443'   # redireciona HTTP->HTTPS
+spec:
+  ingressClassName: alb
+  rules:
+    - host: iris.pocsarcotech.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sklearn-iris-predictor   # Service ClusterIP criado pelo KServe
+                port:
+                  number: 80

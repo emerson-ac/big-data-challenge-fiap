@@ -1,0 +1,19 @@
+# Contexto de build enxuto — não envie dados brutos, caches nem experimentos.
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.dvc/cache
+mlruns
+data/raw
+notebooks
+cluster
+platform
+scripts/*.sh
+models/sklearn-iris
+*.md
+.env

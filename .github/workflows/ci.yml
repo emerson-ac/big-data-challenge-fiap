@@ -1,0 +1,34 @@
+name: CI
+
+# Gate de qualidade em Pull Requests: lint + testes unitários (offline).
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint & Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync --group dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check src/ tests/ --output-format=github
+
+      - name: Testes unitários
+        run: uv run pytest tests/ -v

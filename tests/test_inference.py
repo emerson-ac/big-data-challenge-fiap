@@ -14,6 +14,7 @@ def _build_engine(model_artifacts: dict) -> RecommendationEngine:
         interactions_path=model_artifacts["interactions_path"],
         popularity_path=model_artifacts["popularity_path"],
         vocab_path=model_artifacts["vocab_path"],
+        model_source="local",
     )
 
 
