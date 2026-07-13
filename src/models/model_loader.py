@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 from src.models.item_based_cf import ItemBasedCFRecommender
 from src.models.popularity import PopularityRecommender
+from src.models.registry_recommender import RegistryRecommender
 
 
 class ModelFactory:
@@ -42,4 +43,5 @@ class ModelFactory:
 
 
 ModelFactory.register("item_based_cf", ItemBasedCFRecommender.load)
+ModelFactory.register("item_based_cf_registry", RegistryRecommender.load)
 ModelFactory.register("popularity", PopularityRecommender.load)

@@ -14,8 +14,8 @@ stages:
       nfiles: 4
     - path: src/config.py
       hash: md5
-      md5: b04f32564e9ddba2233a912b090f90c8
-      size: 3756
+      md5: c70a7cb94c5736e8639951a313b9e594
+      size: 4104
     - path: src/pipeline/common.py
       hash: md5
       md5: 16d187a0dd6e4dd4fad0be8d21ffdb4c
@@ -155,20 +155,28 @@ stages:
       hash: md5
       md5: 29b5c37f70b6e57e48e5d5e92f53ffad
       size: 2663
+    - path: src/models/registry_recommender.py
+      hash: md5
+      md5: 834085169b60ac546f045242dc0fb814
+      size: 1711
     - path: src/models/training/user_cf.py
       hash: md5
       md5: 14549e34428c252224c9812bebbabd13
       size: 5260
     - path: src/pipeline/evaluate.py
       hash: md5
-      md5: 14cc4abb5710d4cc1d8a5623febf2ec0
-      size: 8323
+      md5: 0c2cf65865a3470cb4a6c4f550e02057
+      size: 9544
+    - path: src/serving/pyfunc.py
+      hash: md5
+      md5: d1be6932a14e93bef33af32d56c63d83
+      size: 2373
     outs:
     - path: models/MODEL_CARD.md
       hash: md5
-      md5: 2ae1459af548f340b1ef79a0f53ca272
-      size: 1640
+      md5: f3279591f1741b53220de91f3a6cdeaf
+      size: 1722
     - path: models/evaluation/metrics_comparison.csv
       hash: md5
-      md5: b581e86756051e1e0eddd5a40ef57b03
+      md5: 223bc5b0578c9b48b08d8b6265f1bbd1
       size: 446

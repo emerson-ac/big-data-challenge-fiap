@@ -64,6 +64,8 @@ stages:
     cmd: python -m src.pipeline.evaluate
     deps:
       - src/pipeline/evaluate.py
+      - src/serving/pyfunc.py
+      - src/models/registry_recommender.py
       - src/models/training/user_cf.py
       - src/models/ncf.py
       - models/item_based_cf/item_similarity.npz
