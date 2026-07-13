@@ -1,4 +1,4 @@
-"""Recomendador item-based collaborative filtering (modelo Production)."""
+"""Item-based collaborative filtering recommender (Production model)."""
 
 from pathlib import Path
 
@@ -7,14 +7,14 @@ import scipy.sparse as sp
 
 
 class ItemBasedCFRecommender:
-    """Recomendador baseado em similaridade item-item (cosine).
+    """Recommender based on item-item (cosine) similarity.
 
-    Calcula scores multiplicando o histórico de compras do usuário (vetor
-    sobre o catálogo) pela matriz de similaridade item-item treinada.
+    Scores are computed by multiplying the user's purchase history (vector over
+    the catalog) by the trained item-item similarity matrix.
 
     Args:
-        item_similarity: Matriz esparsa (n_items, n_items) de similaridade.
-        interactions: Matriz esparsa (n_users, n_items) de histórico de compras.
+        item_similarity: Sparse (n_items, n_items) similarity matrix.
+        interactions: Sparse (n_users, n_items) purchase-history matrix.
     """
 
     def __init__(
@@ -27,37 +27,37 @@ class ItemBasedCFRecommender:
     def load(
         cls, similarity_path: Path, interactions_path: Path
     ) -> "ItemBasedCFRecommender":
-        """Carrega o recomendador a partir dos artefatos persistidos.
+        """Loads the recommender from the persisted artifacts.
 
         Args:
-            similarity_path: Caminho do .npz com a similaridade item-item.
-            interactions_path: Caminho do .npz com o histórico de compras.
+            similarity_path: Path to the .npz holding item-item similarity.
+            interactions_path: Path to the .npz holding the purchase history.
 
         Returns:
-            Instância pronta para gerar scores.
+            Instance ready to produce scores.
         """
         item_similarity = sp.load_npz(similarity_path)
         interactions = sp.load_npz(interactions_path)
         return cls(item_similarity, interactions)
 
     def score_user(self, user_idx: int) -> np.ndarray:
-        """Calcula o vetor denso de scores por item para um usuário conhecido.
+        """Computes the dense per-item score vector for a known user.
 
         Args:
-            user_idx: Índice interno do usuário (linha da matriz de interações).
+            user_idx: Internal user index (row of the interaction matrix).
 
         Returns:
-            Vetor numpy de scores, shape (n_items,).
+            Numpy score vector, shape (n_items,).
 
         Raises:
-            IndexError: Se user_idx estiver fora do intervalo treinado.
+            IndexError: If user_idx is outside the trained range.
         """
         if not 0 <= user_idx < self._interactions.shape[0]:
-            raise IndexError(f"user_idx {user_idx} fora do intervalo de treino")
+            raise IndexError(f"user_idx {user_idx} outside the trained range")
         user_history = self._interactions[user_idx]
         return user_history.dot(self._item_similarity).toarray().flatten()
 
     @property
     def n_items(self) -> int:
-        """Número de itens no catálogo do modelo."""
+        """Number of items in the model catalog."""
         return self._item_similarity.shape[0]

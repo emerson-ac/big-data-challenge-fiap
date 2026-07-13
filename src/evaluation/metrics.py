@@ -1,4 +1,4 @@
-"""Métricas de ranking compartilhadas por todos os notebooks de modelo."""
+"""Ranking metrics shared by every model notebook."""
 
 import math
 
@@ -6,15 +6,15 @@ import pandas as pd
 
 
 def precision_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
-    """Calcula precision@k para uma lista de recomendações.
+    """Computes precision@k for a recommendation list.
 
     Args:
-        recommended: Itens recomendados, ordenados por score.
-        relevant: Conjunto de itens relevantes (ground truth).
-        k: Número de itens considerados no top-k.
+        recommended: Recommended items, ordered by score.
+        relevant: Set of relevant items (ground truth).
+        k: Number of items considered in the top-k.
 
     Returns:
-        Valor de precision@k entre 0 e 1.
+        precision@k value between 0 and 1.
     """
     if k == 0:
         return 0.0
@@ -23,15 +23,15 @@ def precision_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
 
 
 def recall_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
-    """Calcula recall@k para uma lista de recomendações.
+    """Computes recall@k for a recommendation list.
 
     Args:
-        recommended: Itens recomendados, ordenados por score.
-        relevant: Conjunto de itens relevantes (ground truth).
-        k: Número de itens considerados no top-k.
+        recommended: Recommended items, ordered by score.
+        relevant: Set of relevant items (ground truth).
+        k: Number of items considered in the top-k.
 
     Returns:
-        Valor de recall@k entre 0 e 1.
+        recall@k value between 0 and 1.
     """
     if not relevant:
         return 0.0
@@ -40,15 +40,15 @@ def recall_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
 
 
 def ndcg_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
-    """Calcula NDCG@k (Normalized Discounted Cumulative Gain).
+    """Computes NDCG@k (Normalized Discounted Cumulative Gain).
 
     Args:
-        recommended: Itens recomendados, ordenados por score.
-        relevant: Conjunto de itens relevantes (ground truth).
-        k: Número de itens considerados no top-k.
+        recommended: Recommended items, ordered by score.
+        relevant: Set of relevant items (ground truth).
+        k: Number of items considered in the top-k.
 
     Returns:
-        Valor de NDCG@k entre 0 e 1.
+        NDCG@k value between 0 and 1.
     """
     if not relevant:
         return 0.0
@@ -60,15 +60,15 @@ def ndcg_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
 
 
 def average_precision_at_k(recommended: list[int], relevant: set[int], k: int) -> float:
-    """Calcula average precision@k (componente do MAP@k).
+    """Computes average precision@k (the MAP@k component).
 
     Args:
-        recommended: Itens recomendados, ordenados por score.
-        relevant: Conjunto de itens relevantes (ground truth).
-        k: Número de itens considerados no top-k.
+        recommended: Recommended items, ordered by score.
+        relevant: Set of relevant items (ground truth).
+        k: Number of items considered in the top-k.
 
     Returns:
-        Valor de average precision@k entre 0 e 1.
+        average precision@k value between 0 and 1.
     """
     if not relevant:
         return 0.0
@@ -83,36 +83,45 @@ def average_precision_at_k(recommended: list[int], relevant: set[int], k: int) -
 def hit_rate_at_k(
     recommendations: dict[int, list[int]], ground_truth: dict[int, set[int]], k: int
 ) -> float:
-    """Calcula a proporção de usuários com ao menos um acerto no top-k.
+    """Computes the fraction of users with at least one hit in the top-k.
 
     Args:
-        recommendations: Mapeamento user_idx -> lista de itens recomendados.
-        ground_truth: Mapeamento user_idx -> conjunto de itens relevantes.
-        k: Número de itens considerados no top-k.
+        recommendations: Mapping user_idx -> list of recommended items.
+        ground_truth: Mapping user_idx -> set of relevant items.
+        k: Number of items considered in the top-k.
 
     Returns:
-        Hit rate@k entre 0 e 1.
+        Hit rate@k between 0 and 1.
     """
     if not ground_truth:
         return 0.0
-    hits = sum(
+    hits = _count_hit_users(recommendations, ground_truth, k)
+    return hits / len(ground_truth)
+
+
+def _count_hit_users(
+    recommendations: dict[int, list[int]],
+    ground_truth: dict[int, set[int]],
+    k: int,
+) -> int:
+    """Counts users with at least one relevant item in their top-k."""
+    return sum(
         1
         for user_idx, relevant in ground_truth.items()
         if set(recommendations.get(user_idx, [])[:k]) & relevant
     )
-    return hits / len(ground_truth)
 
 
 def coverage_at_k(recommendations: dict[int, list[int]], n_items: int, k: int) -> float:
-    """Calcula a fração do catálogo recomendada ao menos uma vez.
+    """Computes the fraction of the catalog recommended at least once.
 
     Args:
-        recommendations: Mapeamento user_idx -> lista de itens recomendados.
-        n_items: Tamanho total do catálogo (vocabulário de itens).
-        k: Número de itens considerados no top-k.
+        recommendations: Mapping user_idx -> list of recommended items.
+        n_items: Total catalog size (item vocabulary).
+        k: Number of items considered in the top-k.
 
     Returns:
-        Coverage@k entre 0 e 1.
+        Coverage@k between 0 and 1.
     """
     if n_items == 0:
         return 0.0
@@ -123,13 +132,13 @@ def coverage_at_k(recommendations: dict[int, list[int]], n_items: int, k: int) -
 
 
 def pairs_to_ground_truth(pairs: pd.DataFrame) -> dict[int, set[int]]:
-    """Agrupa pares positivos (user_idx, item_idx) em ground truth por usuário.
+    """Groups positive (user_idx, item_idx) pairs into per-user ground truth.
 
     Args:
-        pairs: DataFrame com colunas user_idx e item_idx.
+        pairs: DataFrame with user_idx and item_idx columns.
 
     Returns:
-        Mapeamento user_idx -> conjunto de item_idx relevantes.
+        Mapping user_idx -> set of relevant item_idx.
     """
     return pairs.groupby("user_idx")["item_idx"].apply(set).to_dict()
 
@@ -137,16 +146,27 @@ def pairs_to_ground_truth(pairs: pd.DataFrame) -> dict[int, set[int]]:
 def evaluate_recommendations(
     recommendations: dict[int, list[int]], ground_truth: dict[int, set[int]], k: int
 ) -> dict[str, float]:
-    """Agrega as 4 métricas oficiais (média sobre usuários) para um modelo.
+    """Aggregates the 4 official metrics (user-averaged) for a model.
 
     Args:
-        recommendations: Mapeamento user_idx -> lista de itens recomendados.
-        ground_truth: Mapeamento user_idx -> conjunto de itens relevantes.
-        k: Número de itens considerados no top-k.
+        recommendations: Mapping user_idx -> list of recommended items.
+        ground_truth: Mapping user_idx -> set of relevant items.
+        k: Number of items considered in the top-k.
 
     Returns:
-        Dicionário com precision_at_k, recall_at_k, ndcg_at_k e map_at_k.
+        Dictionary with precision_at_k, recall_at_k, ndcg_at_k and map_at_k.
     """
+    rows = _collect_metric_rows(recommendations, ground_truth, k)
+    columns = ["precision_at_k", "recall_at_k", "ndcg_at_k", "map_at_k"]
+    return pd.DataFrame(rows, columns=columns).mean().to_dict()
+
+
+def _collect_metric_rows(
+    recommendations: dict[int, list[int]],
+    ground_truth: dict[int, set[int]],
+    k: int,
+) -> list[tuple[float, float, float, float]]:
+    """Collects the per-user metric tuple for every user in ground truth."""
     rows = []
     for user_idx, relevant in ground_truth.items():
         recs = recommendations.get(user_idx, [])
@@ -158,5 +178,4 @@ def evaluate_recommendations(
                 average_precision_at_k(recs, relevant, k),
             )
         )
-    columns = ["precision_at_k", "recall_at_k", "ndcg_at_k", "map_at_k"]
-    return pd.DataFrame(rows, columns=columns).mean().to_dict()
+    return rows

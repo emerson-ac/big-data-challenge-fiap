@@ -1,4 +1,4 @@
-"""Modelo Neural Collaborative Filtering (NCF) para feedback implícito."""
+"""Neural Collaborative Filtering (NCF) model for implicit feedback."""
 
 import numpy as np
 import torch
@@ -6,13 +6,13 @@ import torch.nn as nn
 
 
 class NeuralCollaborativeFiltering(nn.Module):
-    """Modelo NCF: embeddings de usuário/item combinados via MLP.
+    """NCF model: user/item embeddings combined through an MLP.
 
     Args:
-        n_users: Número de usuários no vocabulário.
-        n_items: Número de itens no vocabulário.
-        embedding_dim: Dimensão dos embeddings de usuário e item.
-        hidden_dims: Tamanhos das camadas ocultas do MLP.
+        n_users: Number of users in the vocabulary.
+        n_items: Number of items in the vocabulary.
+        embedding_dim: Dimension of the user and item embeddings.
+        hidden_dims: Sizes of the MLP hidden layers.
     """
 
     def __init__(
@@ -35,14 +35,14 @@ class NeuralCollaborativeFiltering(nn.Module):
         self.mlp = nn.Sequential(*layers)
 
     def forward(self, user_ids: torch.Tensor, item_ids: torch.Tensor) -> torch.Tensor:
-        """Calcula o score de afinidade usuário-produto.
+        """Computes the user-item affinity score.
 
         Args:
-            user_ids: Tensor de índices de usuário, shape (batch,).
-            item_ids: Tensor de índices de item, shape (batch,).
+            user_ids: Tensor of user indices, shape (batch,).
+            item_ids: Tensor of item indices, shape (batch,).
 
         Returns:
-            Tensor de scores em (0, 1), shape (batch,).
+            Tensor of scores in (0, 1), shape (batch,).
         """
         embeddings = [self.user_embedding(user_ids), self.item_embedding(item_ids)]
         x = torch.cat(embeddings, dim=1)
@@ -56,16 +56,16 @@ def score_all_items(
     n_items: int,
     batch_size: int = 1000,
 ) -> np.ndarray:
-    """Calcula a matriz densa de scores (usuarios x itens) de um modelo NCF.
+    """Computes the dense score matrix (users x items) for an NCF model.
 
     Args:
-        model: Modelo NCF treinado.
-        user_indices: Lista de user_idx a pontuar.
-        n_items: Tamanho do catalogo de itens.
-        batch_size: Numero de usuarios processados por lote.
+        model: Trained NCF model.
+        user_indices: List of user_idx to score.
+        n_items: Size of the item catalog.
+        batch_size: Number of users processed per batch.
 
     Returns:
-        Matriz numpy (len(user_indices), n_items) com os scores.
+        Numpy matrix (len(user_indices), n_items) with the scores.
     """
     model.eval()
     item_ids = torch.arange(n_items)

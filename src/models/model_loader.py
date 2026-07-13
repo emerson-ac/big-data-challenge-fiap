@@ -1,4 +1,4 @@
-"""Factory para criação/carregamento de modelos de recomendação."""
+"""Factory for creating/loading recommendation models."""
 
 from typing import Any, Callable
 
@@ -7,37 +7,37 @@ from src.models.popularity import PopularityRecommender
 
 
 class ModelFactory:
-    """Factory Pattern para instanciar/carregar recomendadores pelo nome."""
+    """Factory Pattern to instantiate/load recommenders by name."""
 
     _builders: dict[str, Callable[..., Any]] = {}
 
     @classmethod
     def register(cls, name: str, builder: Callable[..., Any]) -> None:
-        """Registra um builder (classe ou callable) sob um nome.
+        """Registers a builder (class or callable) under a name.
 
         Args:
-            name: Identificador do tipo de modelo (ex.: "item_based_cf").
-            builder: Callable que recebe **kwargs e retorna a instância carregada.
+            name: Identifier of the model type (e.g. "item_based_cf").
+            builder: Callable accepting **kwargs and returning the loaded instance.
         """
         cls._builders[name] = builder
 
     @classmethod
     def create(cls, model_type: str, **kwargs: Any) -> Any:
-        """Cria/carrega um modelo registrado pelo nome.
+        """Creates/loads a model registered by name.
 
         Args:
-            model_type: Nome do modelo registrado.
-            **kwargs: Argumentos passados ao builder do modelo.
+            model_type: Name of the registered model.
+            **kwargs: Arguments forwarded to the model builder.
 
         Returns:
-            Instância do modelo carregado.
+            The loaded model instance.
 
         Raises:
-            ValueError: Se model_type não estiver registrado.
+            ValueError: If model_type is not registered.
         """
         builder = cls._builders.get(model_type)
         if builder is None:
-            raise ValueError(f"Modelo '{model_type}' não registrado")
+            raise ValueError(f"Model '{model_type}' is not registered")
         return builder(**kwargs)
 
 

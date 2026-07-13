@@ -1,4 +1,4 @@
-"""Fixtures compartilhadas pelos testes do módulo de predição."""
+"""Shared fixtures for the inference module tests."""
 
 import pickle
 from pathlib import Path
@@ -12,7 +12,7 @@ from src.models.inference import RecommendationEngine
 
 @pytest.fixture
 def toy_similarity() -> sp.csr_matrix:
-    """Similaridade item-item 4x4: item0~item1 e item2~item3."""
+    """4x4 item-item similarity: item0~item1 and item2~item3."""
     dense = np.array(
         [
             [1.0, 0.5, 0.0, 0.0],
@@ -27,14 +27,14 @@ def toy_similarity() -> sp.csr_matrix:
 
 @pytest.fixture
 def toy_interactions() -> sp.csr_matrix:
-    """Histórico: usuário 0 comprou o item 0; usuário 1 não comprou nada."""
+    """History: user 0 bought item 0; user 1 bought nothing."""
     dense = np.array([[1, 0, 0, 0], [0, 0, 0, 0]], dtype=np.int8)
     return sp.csr_matrix(dense)
 
 
 @pytest.fixture
 def toy_vocab() -> dict:
-    """Vocabulário com 2 usuários conhecidos e catálogo de 4 produtos."""
+    """Vocabulary with 2 known users and a catalog of 4 products."""
     return {
         "user_id_to_idx": {10: 0, 20: 1},
         "idx_to_product_id": np.array([100, 200, 300, 400]),
@@ -43,7 +43,7 @@ def toy_vocab() -> dict:
 
 @pytest.fixture
 def toy_popularity_ranking() -> np.ndarray:
-    """Ranking de popularidade global (item_idx do mais ao menos popular)."""
+    """Global popularity ranking (item_idx from most to least popular)."""
     return np.array([3, 2, 1, 0])
 
 
@@ -55,7 +55,7 @@ def model_artifacts(
     toy_vocab: dict,
     toy_popularity_ranking: np.ndarray,
 ) -> dict[str, Path]:
-    """Persiste os artefatos sintéticos em disco e retorna seus caminhos."""
+    """Persists the synthetic artifacts to disk and returns their paths."""
     similarity_path = tmp_path / "item_similarity.npz"
     interactions_path = tmp_path / "interactions_prior.npz"
     popularity_path = tmp_path / "ranking.pkl"

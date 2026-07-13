@@ -10,7 +10,7 @@ Read this documentation if you want to know about the naming conventions used in
 
 - Snake_case para nomes de arquivos e módulos: `data_loader.py`, `model_factory.py`.
 - Um módulo por responsabilidade (ex.: `preprocessing.py` não deve conter lógica de treinamento).
-- Notebooks numerados por ordem de execução: `01_eda.ipynb`, `02_baseline.ipynb` (ver [NOTEBOOKS.md](NOTEBOOKS.md)).
+- Notebooks numerados por ordem de execução: `01_eda.ipynb`, `02_preprocessing.ipynb`, ... (ver [NOTEBOOKS.md](NOTEBOOKS.md)).
 
 ### Classes
 
@@ -40,15 +40,15 @@ def compute_precision_at_k(
     relevant: set[int],
     k: int,
 ) -> float:
-    """Calcula precision@k para uma lista de recomendações.
+    """Computes precision@k for a recommendation list.
 
     Args:
-        recommended: Itens recomendados, ordenados por score.
-        relevant: Conjunto de itens relevantes (ground truth).
-        k: Número de itens considerados no top-k.
+        recommended: Recommended items, ordered by score.
+        relevant: Set of relevant items (ground truth).
+        k: Number of items considered in the top-k.
 
     Returns:
-        Valor de precision@k entre 0 e 1.
+        precision@k value between 0 and 1.
     """
     top_k = recommended[:k]
     hits = sum(1 for item in top_k if item in relevant)
@@ -76,10 +76,10 @@ logger.info("model_training_started", model_type="mlp", epochs=epochs, lr=learni
 
 ## SOLID neste Projeto
 
-- **S (Single Responsibility):** cada classe/módulo tem um único motivo para mudar (ex.: `RecommendationService` não lida com parsing de request).
-- **O (Open/Closed):** novos modelos/preprocessadores são adicionados via `ModelFactory`/`Strategy`, sem alterar código existente.
+- **S (Single Responsibility):** cada classe/módulo tem um único motivo para mudar (ex.: `RecommendationEngine` orquestra inferência, não faz parsing de dados).
+- **O (Open/Closed):** novos modelos/preprocessadores são adicionados via `ModelFactory.register(...)`/`Strategy`, sem alterar código existente.
 - **L (Liskov Substitution):** qualquer implementação de `PreprocessingStrategy` deve ser intercambiável sem quebrar o chamador.
-- **I (Interface Segregation):** interfaces pequenas e específicas (ex.: `Predictable`, `Trainable`) em vez de uma interface genérica de "modelo".
+- **I (Interface Segregation):** interfaces pequenas e específicas (ex.: `Recommender`, `PreprocessingStrategy`) em vez de uma interface genérica de "modelo".
 - **D (Dependency Inversion):** serviços dependem de abstrações (`ModelFactory.create(...)`), não de classes concretas.
 
 ## References
