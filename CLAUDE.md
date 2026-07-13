@@ -15,29 +15,29 @@ Para detalhes, leia os arquivos referenciados em docs/.
 
 Sistema de recomendação de produtos para um e-commerce, baseado no comportamento de navegação dos usuários.
 
-- **Dataset**: Dados de interações de e-commerce (instacart-online-grocery-basket-analysis-dataset {https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset?resource=download}) 
+- **Dataset**: Dados de interações de e-commerce (instacart-online-grocery-basket-analysis-dataset {https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset?resource=download})
 - **Modelo principal**: Rede neural (MLP ou embedding-based) treinada com PyTorch.
 
 ---
 
 ## Stack Tecnológico e Ferramentas
 
-- **Linguagem & Dependências**: Python com gerenciamento via pyproject.toml usando uv.  
+- **Linguagem & Dependências**: Python com gerenciamento via pyproject.toml usando uv.
 - **Modelagem**: PyTorch para a rede neural e Scikit-Learn para baselines e pré-processamento.
 - **Rastreamento & Registro**: MLflow para tracking de experimentos e Model Registry.
 - **Versionamento**: DVC para versionamento de dados e pipeline reprodutível.
-- **Infraestrutura**: Docker com Dockerfile multi-stage e docker-compose.yml. 
+- **Infraestrutura**: Docker com Dockerfile multi-stage e docker-compose.yml.
 
 ---
 
 ## Regras de Arquitetura e Clean Code
 
-- **Estrutura de Diretórios**: O projeto deve obrigatoriamente conter as pastas src/, tests/, data/, models/ e configs/.  
-- **Qualidade de Código**: As funções devem ter no máximo 20 linhas.  
-- **Tipagem e Documentação**: Uso obrigatório de type hints em todas as funções públicas e docstrings no padrão Google style.  
-- **Linting e Hooks**: Configuração do Ruff sem erros e utilização de pre-commit hooks.  
-- **Design Patterns**: Implementação de pelo menos um padrão de projeto, como Factory (para criar modelos), Strategy (para pré-processadores) ou Template Method.  
-- **Ambiente Isolado**: Separação clara entre dependências de produção e desenvolvimento, com o lock file comitado e configurações externalizadas via .env.  
+- **Estrutura de Diretórios**: O projeto deve obrigatoriamente conter as pastas src/, tests/, data/, models/ e configs/.
+- **Qualidade de Código**: As funções devem ter no máximo 20 linhas.
+- **Tipagem e Documentação**: Uso obrigatório de type hints em todas as funções públicas e docstrings no padrão Google style.
+- **Linting e Hooks**: Configuração do Ruff sem erros e utilização de pre-commit hooks.
+- **Design Patterns**: Implementação de pelo menos um padrão de projeto, como Factory (para criar modelos), Strategy (para pré-processadores) ou Template Method.
+- **Ambiente Isolado**: Separação clara entre dependências de produção e desenvolvimento, com o lock file comitado e configurações externalizadas via .env.
 
 ---
 
