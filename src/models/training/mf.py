@@ -44,18 +44,6 @@ def _run_search(data, val_users, k, cfg, n_items, seed) -> tuple[list[dict], int
     return results, best
 
 
-def _mf_payload(k, best, variance, search, val, test) -> dict:
-    """Assembles the Matrix Factorization metrics payload."""
-    return {
-        "k": k,
-        "n_components": best,
-        "explained_variance_ratio": variance,
-        "search_results": search,
-        "validation": val,
-        "test": test,
-    }
-
-
 def train(data: ProcessedData, k: int, cfg: dict, out_dir: Path, seed: int) -> dict:
     """Trains MF with a random search over n_components.
 
@@ -81,6 +69,13 @@ def train(data: ProcessedData, k: int, cfg: dict, out_dir: Path, seed: int) -> d
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / "user_factors.npy", user_factors)
     np.save(out_dir / "item_factors.npy", item_factors)
-    payload = _mf_payload(k, best, variance, search, val, test)
+    payload = {
+        "k": k,
+        "n_components": best,
+        "explained_variance_ratio": variance,
+        "search_results": search,
+        "validation": val,
+        "test": test,
+    }
     save_metrics(out_dir, payload)
     return payload

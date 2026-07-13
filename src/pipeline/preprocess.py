@@ -238,25 +238,32 @@ def _build_vocab(products, sd) -> dict:
 
 def _build_split_data(orders, prior, train, pre, seed) -> dict:
     """Builds the catalog, split, maps and interaction matrix."""
-    item_map, idx_p, cov = build_catalog(prior, pre["top_n_products"])
+    item_map, idx_to_product_id, coverage = build_catalog(prior, pre["top_n_products"])
     baskets, eval_users = build_future_baskets(orders, train, item_map)
     segments = segment_users(orders.groupby("user_id", observed=True).size())
-    tu, vu, wu = split_users(eval_users, segments, pre, seed)
-    idx_u = np.sort(eval_users).astype(np.int32)
-    umap = {uid: idx for idx, uid in enumerate(idx_u)}
-    matrix = _build_matrix(orders, prior, item_map, umap, idx_u, idx_p)
-    return _split_dict(item_map, idx_p, cov, baskets, tu, vu, wu, idx_u, umap, matrix)
-
-
-def _build_matrix(orders, prior, item_map, umap, idx_u, idx_p) -> sp.csr_matrix:
-    """Builds the interaction matrix from filtered prior interactions."""
-    shape = (len(idx_u), len(idx_p))
-    return build_interaction_matrix(
-        _filter_prior(orders, prior, item_map, umap), umap, item_map, shape
+    train_u, val_u, test_u = split_users(eval_users, segments, pre, seed)
+    idx_to_user_id = np.sort(eval_users).astype(np.int32)
+    user_map = {uid: idx for idx, uid in enumerate(idx_to_user_id)}
+    shape = (len(idx_to_user_id), len(idx_to_product_id))
+    matrix = build_interaction_matrix(
+        _filter_prior(orders, prior, item_map, user_map), user_map, item_map, shape
+    )
+    return _split_dict(
+        item_map,
+        idx_to_product_id,
+        coverage,
+        baskets,
+        train_u,
+        val_u,
+        test_u,
+        idx_to_user_id,
+        user_map,
+        shape,
+        matrix,
     )
 
 
-def _split_dict(item_map, idx_p, cov, baskets, tu, vu, wu, idx_u, umap, m):
+def _split_dict(item_map, idx_p, cov, baskets, tu, vu, test_u, idx_u, umap, shape, m):
     """Assembles the split-data dictionary returned by _build_split_data."""
     return {
         "item_map": item_map,
@@ -265,10 +272,10 @@ def _split_dict(item_map, idx_p, cov, baskets, tu, vu, wu, idx_u, umap, m):
         "baskets": baskets,
         "train_users": tu,
         "val_users": vu,
-        "test_users": wu,
+        "test_users": test_u,
         "idx_to_user_id": idx_u,
         "user_map": umap,
-        "shape": (len(idx_u), len(idx_p)),
+        "shape": shape,
         "matrix": m,
     }
 

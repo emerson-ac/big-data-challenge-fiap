@@ -127,35 +127,30 @@ def _prep(interactions, gt) -> tuple:
     return n_items, users, users[: min(3000, len(users))]
 
 
-def _add_row(rows, name, recs_fn, gt, ctx):
-    """Times a recs builder and appends its comparison row to ``rows``."""
-    sub, patterns = _MODEL_DIRS[name]
-    recs, lat = _timed(recs_fn)
-    md = ctx["md"]
-    rows[name] = _model_row(recs, gt, ctx["n_items"], ctx["k"], md / sub, patterns, lat)
-
-
-_MODEL_DIRS = {
-    "popularity": ("baseline_popularity", ["*.pkl"]),
-    "item_based_cf": ("item_based_cf", ["*.npz"]),
-    "user_based_cf": ("user_based_cf", ["*.pkl"]),
-    "matrix_factorization": ("matrix_factorization", ["*.npy"]),
-    "ncf": ("neural_network", ["*.pt"]),
-}
-
-
 def _collect_rows(models_dir, interactions, gt, k) -> dict:
     """Rebuilds the 5 models and collects their comparison rows (test split)."""
     n_items, users, sample = _prep(interactions, gt)
-    sgt = {u: gt[u] for u in sample}
-    md, it = models_dir, interactions
-    ctx = {"md": md, "n_items": n_items, "k": k}
+    sample_gt = {u: gt[u] for u in sample}
+    md = models_dir
     rows: dict[str, dict] = {}
-    _add_row(rows, "popularity", lambda: _popularity_recs(md, users, k), gt, ctx)
-    _add_row(rows, "item_based_cf", lambda: _item_cf_recs(md, it, users, k), gt, ctx)
-    _add_row(rows, "user_based_cf", lambda: _user_cf_recs(md, it, sample, k), sgt, ctx)
-    _add_row(rows, "matrix_factorization", lambda: _mf_recs(md, users, k), gt, ctx)
-    _add_row(rows, "ncf", lambda: _ncf_recs(md, it, users, k), gt, ctx)
+    pop, lat = _timed(lambda: _popularity_recs(md, users, k))
+    rows["popularity"] = _model_row(
+        pop, gt, n_items, k, md / "baseline_popularity", ["*.pkl"], lat
+    )
+    item, lat = _timed(lambda: _item_cf_recs(md, interactions, users, k))
+    rows["item_based_cf"] = _model_row(
+        item, gt, n_items, k, md / "item_based_cf", ["*.npz"], lat
+    )
+    ucf, lat = _timed(lambda: _user_cf_recs(md, interactions, sample, k))
+    rows["user_based_cf"] = _model_row(
+        ucf, sample_gt, n_items, k, md / "user_based_cf", ["*.pkl"], lat
+    )
+    mfr, lat = _timed(lambda: _mf_recs(md, users, k))
+    rows["matrix_factorization"] = _model_row(
+        mfr, gt, n_items, k, md / "matrix_factorization", ["*.npy"], lat
+    )
+    ncf, lat = _timed(lambda: _ncf_recs(md, interactions, users, k))
+    rows["ncf"] = _model_row(ncf, gt, n_items, k, md / "neural_network", ["*.pt"], lat)
     return rows
 
 
