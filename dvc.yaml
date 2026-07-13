@@ -1,0 +1,75 @@
+# Pipeline reprodutível: preprocess -> train -> evaluate.
+# Rode com: uv run dvc repro   (usa data/raw/ como entrada)
+# Outputs com `cache: false` permanecem versionados no git (não vão ao cache DVC).
+stages:
+  preprocess:
+    cmd: python -m src.pipeline.preprocess
+    deps:
+      - data/raw
+      - src/pipeline/preprocess.py
+      - src/pipeline/common.py
+      - src/config.py
+      - configs/model_config.yaml
+    outs:
+      - data/processed/interactions_prior.npz:
+          cache: false
+      - data/processed/vocabularies.pkl:
+          cache: false
+      - data/processed/train_pairs.pkl:
+          cache: false
+      - data/processed/val_pairs.pkl:
+          cache: false
+      - data/processed/test_pairs.pkl:
+          cache: false
+      - data/processed/split_meta.json:
+          cache: false
+
+  train:
+    cmd: python -m src.pipeline.train
+    deps:
+      - data/processed
+      - src/pipeline/train.py
+      - src/models/training
+      - src/models/ncf.py
+      - configs/model_config.yaml
+    outs:
+      - models/baseline_popularity/ranking.pkl:
+          cache: false
+      - models/item_based_cf/item_similarity.npz:
+          cache: false
+      - models/user_based_cf/knn_model.pkl:
+          cache: false
+      - models/matrix_factorization/user_factors.npy:
+          cache: false
+      - models/matrix_factorization/item_factors.npy:
+          cache: false
+      - models/neural_network/model.pt:
+          cache: false
+    metrics:
+      - models/baseline_popularity/metrics.json:
+          cache: false
+      - models/item_based_cf/metrics.json:
+          cache: false
+      - models/user_based_cf/metrics.json:
+          cache: false
+      - models/matrix_factorization/metrics.json:
+          cache: false
+      - models/neural_network/metrics.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.pipeline.evaluate
+    deps:
+      - src/pipeline/evaluate.py
+      - src/serving/pyfunc.py
+      - models/item_based_cf/item_similarity.npz
+      - models/matrix_factorization/user_factors.npy
+      - models/user_based_cf/knn_model.pkl
+      - models/neural_network/model.pt
+      - models/baseline_popularity/ranking.pkl
+    outs:
+      - models/MODEL_CARD.md:
+          cache: false
+    metrics:
+      - models/evaluation/metrics_comparison.csv:
+          cache: false

@@ -1,0 +1,54 @@
+name: provision-cluster
+
+# Sobe o ambiente do ZERO: cria o cluster EKS + bucket S3 (bootstrap) e
+# em seguida instala plataforma + modelo (deploy). Só manual — criar cluster
+# leva ~15-20 min e não deve rodar a cada push (o deploy.yml cuida do dia a dia).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write     # necessário para OIDC (assumir role na AWS)
+  contents: read
+
+# Evita provision e destroy rodando ao mesmo tempo (subir e derrubar juntos).
+concurrency:
+  group: cluster-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AWS_REGION: us-east-1
+      CLUSTER: arcobridgegitops
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}   # definido por scripts/setup-github-oidc.sh
+          aws-region: us-east-1
+
+      - name: Install eksctl
+        run: |
+          curl -sSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" \
+            | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin/
+          eksctl version
+
+      - uses: azure/setup-helm@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install scikit-learn joblib
+
+      - name: Bootstrap (cria cluster EKS + bucket S3)
+        run: bash scripts/bootstrap.sh
+
+      - name: Deploy (platform + model)
+        run: bash scripts/deploy.sh

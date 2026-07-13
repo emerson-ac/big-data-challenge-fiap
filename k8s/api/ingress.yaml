@@ -1,0 +1,29 @@
+# Ingress ALB público para a API de recomendação.
+# O AWS Load Balancer Controller cria um ALB internet-facing a partir daqui,
+# usando o mesmo cert wildcard *.pocsarcotech.com do bônus (ACM us-east-1).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: recsys-api
+  namespace: models
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    # Health check do ALB usa o endpoint /health da própria API FastAPI.
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:177300752486:certificate/eebc6271-527b-45a6-99b8-b7b888cdbdc2
+    alb.ingress.kubernetes.io/ssl-redirect: '443'   # redireciona HTTP->HTTPS
+spec:
+  ingressClassName: alb
+  rules:
+    - host: recsys-api.pocsarcotech.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: recsys-api
+                port:
+                  number: 80

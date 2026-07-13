@@ -1,0 +1,8 @@
+# Values do chart eks/aws-load-balancer-controller.
+# A ServiceAccount já é criada pelo eksctl (com IRSA), por isso create: false.
+clusterName: arcobridgegitops
+region: us-east-1
+vpcId: vpc-0b4cc706dabdbf20f
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller

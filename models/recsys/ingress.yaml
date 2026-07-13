@@ -1,0 +1,27 @@
+# Ingress ALB público para o predictor de recomendação.
+# Host e certificado são placeholders — ajuste para o seu domínio/ACM.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: recsys
+  namespace: models
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /v1/models/recsys
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: REPLACE_WITH_ACM_CERTIFICATE_ARN
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+spec:
+  ingressClassName: alb
+  rules:
+    - host: recsys.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: recsys-predictor
+                port:
+                  number: 80

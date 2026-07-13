@@ -1,0 +1,45 @@
+# Orquestração local da API de recomendação.
+# Suba com: docker compose up --build
+#
+# Por padrão a API usa o MLflow EXTERNO (RECSYS_MLFLOW_TRACKING_URI) e carrega o
+# modelo do Registry (@production). A API monta data/ e models/ do host para o
+# vocabulário e o fallback de popularidade (gerados por `dvc repro`).
+#
+# Para rodar um MLflow local (dev offline), suba o profile dedicado:
+#   docker compose --profile local-mlflow up --build
+# e aponte a API para ele: RECSYS_MLFLOW_TRACKING_URI=http://mlflow:5000
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "8000:8000"
+    environment:
+      RECSYS_MODEL_TYPE: item_based_cf
+      RECSYS_MODEL_SOURCE: ${RECSYS_MODEL_SOURCE:-registry}
+      RECSYS_MLFLOW_TRACKING_URI: ${RECSYS_MLFLOW_TRACKING_URI:-https://mlflow.pocsarcotech.com}
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # MLflow local — opcional, só para dev offline (profile local-mlflow).
+  # Backend sqlite (o MLflow 3 descontinuou o file store) + artefatos proxiados.
+  mlflow:
+    profiles: ["local-mlflow"]
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/app/mlruns
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////app/mlruns/mlflow.db
+      --artifacts-destination /app/mlruns/artifacts --serve-artifacts

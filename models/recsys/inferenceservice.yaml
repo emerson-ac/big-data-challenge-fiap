@@ -1,0 +1,32 @@
+# InferenceService do recomendador (custom container, modo RawDeployment).
+# Substitua a imagem pelo seu registry (ECR/GHCR) antes de aplicar.
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: recsys
+  namespace: models
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 3
+    scaleMetric: cpu
+    scaleTarget: 80
+    containers:
+      - name: kserve-container
+        # TODO: publique a imagem (models/recsys/Dockerfile) e ajuste aqui.
+        image: REGISTRY/recsys:latest
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: RECSYS_MODEL_TYPE
+            value: item_based_cf
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"

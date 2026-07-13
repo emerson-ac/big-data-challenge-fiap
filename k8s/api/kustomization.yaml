@@ -1,0 +1,10 @@
+# Aplica todos os manifests da API de uma vez:
+#   kubectl apply -k k8s/api
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: models
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml

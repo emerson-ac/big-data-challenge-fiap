@@ -14,15 +14,13 @@ Sistema de recomendação de produtos para e-commerce baseado em comportamento d
 
 ## Requisitos Obrigatórios
 
-Status atual: **Etapa 1 (Clean Code e Estrutura)** em andamento.
-
 - [x] **Estrutura:** Diretórios `src/`, `tests/`, `data/`, `models/`, `configs/`
-- [ ] **Código:** Funções ≤ 20 linhas, type hints, docstrings Google Style
-- [ ] **Padrões:** Implementação de Design Patterns (Factory, Strategy)
-- [ ] **Ambiente:** Dependências de prod/dev (pytorch, sklearn, mlflow, dvc) via `pyproject.toml` e `uv`
-- [ ] **ML:** Modelo PyTorch + Baselines Scikit-Learn, 4+ métricas
-- [ ] **MLOps:** Docker, DVC (3+ estágios), MLflow Tracking + Registry
-- [ ] **Qualidade:** Ruff linting, pre-commit hooks, commits semânticos
+- [x] **Código:** Funções ≤ 20 linhas, type hints, docstrings Google Style
+- [x] **Padrões:** Design Patterns — Factory (`src/models/model_loader.py`) e Strategy (`src/api/services/enrichment.py`)
+- [x] **Ambiente:** Dependências de prod/dev (pytorch, sklearn, mlflow, dvc) via `pyproject.toml` e `uv`; config externalizada em `.env` (Pydantic Settings)
+- [x] **ML:** Rede neural PyTorch (NCF) + 4 baselines Scikit-Learn, 6 métricas de ranking
+- [x] **MLOps:** Docker multi-stage + docker-compose, DVC (3 estágios: preprocess → train → evaluate), MLflow Tracking + Model Registry
+- [x] **Qualidade:** Ruff sem erros, pre-commit hooks, Conventional Commits
 
 Ver [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) para o checklist completo e atualizado.
 
@@ -32,33 +30,31 @@ Ver [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) para o checklist completo e atu
 
 ```
 .
-├── src/                    # Código principal
-│   ├── api/               # API REST (FastAPI)
-│   ├── models/            # Modelos de ML
-│   └── utils/             # Utilitários
-├── tests/                 # Testes unitários
-├── notebooks/             # Análise e experimentos
-│   ├── 01_eda.ipynb
-│   ├── 02_baseline.ipynb
-│   ├── 03_preprocessing.ipynb
-│   ├── 04_model_training.ipynb
-│   └── 05_evaluation.ipynb
+├── src/
+│   ├── api/               # API REST (FastAPI) + Strategy Pattern (services/)
+│   ├── pipeline/          # Estágios DVC: preprocess, train, evaluate
+│   ├── models/            # Modelos, Factory (model_loader) e rotinas de treino
+│   ├── evaluation/        # Métricas de ranking e utilitários
+│   ├── serving/           # Wrapper pyfunc p/ o MLflow Registry
+│   └── config.py          # Settings externalizadas (Pydantic + .env)
+├── tests/                 # Testes unitários (pytest)
+├── notebooks/             # 01_eda → 02_preprocessing → 03..07 modelos → 08_comparison
 ├── data/
-│   ├── raw/              # Dados brutos (não commitados)
-│   └── processed/        # Dados processados (versionado via DVC)
-├── models/               # Artefatos de modelos
-├── configs/              # Configurações YAML
-├── docs/                 # Documentação
-│   ├── REQUIREMENTS.md
-│   ├── NOTEBOOKS.md
-│   ├── api-conventions.md
-│   ├── naming-conventions.md
-│   └── design-pattern.md
-├── Dockerfile            # Containerização
-├── docker-compose.yml
-├── dvc.yaml             # Pipeline DVC
-├── pyproject.toml       # Dependências e configs
-└── README.md            # Este arquivo
+│   ├── raw/               # Dados brutos (Kaggle, não commitados)
+│   └── processed/         # Dados processados (gerados pelo pipeline)
+├── models/                # Artefatos de modelos + MODEL_CARD.md
+│   ├── sklearn-iris/       # BÔNUS: modelo demo KServe
+│   └── recsys/             # BÔNUS: predictor KServe do recomendador
+├── configs/               # Configurações YAML
+├── scripts/               # validate_env, gen_synthetic_data, deploy/bootstrap (bônus)
+├── cluster/ · platform/   # BÔNUS: infra KServe/EKS declarativa
+├── docs/                  # Documentação (REQUIREMENTS, NOTEBOOKS, patterns...)
+├── Dockerfile             # Containerização multi-stage
+├── docker-compose.yml     # API + servidor MLflow
+├── dvc.yaml / dvc.lock    # Pipeline reprodutível (3 estágios)
+├── .env.example           # Modelo de configuração
+├── pyproject.toml         # Dependências e configs
+└── README.md              # Este arquivo
 ```
 
 ---
@@ -93,8 +89,11 @@ cd big-data-challenge-fiap
 uv sync
 uv run pre-commit install
 
-# Validar ambiente
-uvicorn python scripts/validate_env.py
+# Configurar variáveis de ambiente
+cp .env.example .env
+
+# Validar ambiente (Python, dependências e estrutura)
+uv run python scripts/validate_env.py
 ```
 
 ### 2. Preparar Dados
@@ -115,34 +114,43 @@ ls data/raw/
 
 ### 3. Executar Pipeline
 
+O pipeline reprodutível vive em `src/pipeline/` e é orquestrado pelo DVC
+(3 estágios). A lógica é a mesma dos notebooks `02`–`08`, portada para scripts.
+
 ```bash
-# Usando DVC (reprodutível)
-dvc repro
+# Pipeline completo e reprodutível (preprocess → train → evaluate)
+uv run dvc repro
 
-# Ou manualmente:
-# 1. EDA
-jupyter notebook notebooks/01_eda.ipynb
-
-# 2. Baselines
-jupyter notebook notebooks/02_baseline.ipynb
-
-# 3. Pré-processamento
-jupyter notebook notebooks/03_preprocessing.ipynb
-
-# 4. Treinamento
-jupyter notebook notebooks/04_model_training.ipynb
-
-# 5. Avaliação
-jupyter notebook notebooks/05_evaluation.ipynb
+# Ou estágio a estágio:
+uv run python -m src.pipeline.preprocess   # data/processed/*
+uv run python -m src.pipeline.train        # treina os 5 modelos → models/*
+uv run python -m src.pipeline.evaluate     # comparação + MODEL_CARD + Registry
 ```
+
+> **Sem os dados do Kaggle?** Gere um mini-dataset sintético para exercitar o
+> pipeline ponta a ponta em segundos:
+> `uv run python scripts/gen_synthetic_data.py && uv run dvc repro`.
+> O `dvc.lock` versionado foi gerado nessa validação sintética; rode `dvc repro`
+> com os CSVs reais em `data/raw/` para regenerar os artefatos e o lock reais.
+
+Os notebooks (`notebooks/01_eda.ipynb` … `08_model_comparison.ipynb`) permanecem
+como registro exploratório de cada modelo.
 
 ### 4. Rastrear Experimentos
 
-```bash
-# Iniciar MLflow UI
-mlflow ui --host 0.0.0.0 --port 5000
+O tracking usa um **servidor MLflow externo** por padrão
+(`RECSYS_MLFLOW_TRACKING_URI=https://mlflow.pocsarcotech.com`, MLflow 3.x). Os
+experimentos são namespaced sob `recsys-instacart/*` e o melhor modelo é promovido
+por **alias `@production`** no Model Registry (MLflow 3 removeu os *stages*). Os
+artefatos são proxiados pelo servidor — **não** são necessárias credenciais AWS.
 
-# Acessar: http://localhost:5000
+```bash
+# UI do servidor externo
+open https://mlflow.pocsarcotech.com
+
+# Dev offline: backend sqlite (o MLflow 3 descontinuou o file store)
+export RECSYS_MLFLOW_TRACKING_URI=sqlite:///mlflow.db
+mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000   # http://localhost:5000
 ```
 
 ### 5. Iniciar API
@@ -192,16 +200,53 @@ git commit -m "refactor: extrair service de recomendação"
 
 ---
 
+## CI/CD (GitHub Actions)
+
+Três workflows automatizam qualidade, retreino e deploy (a infra KServe do bônus
+continua no `deploy.yml`/`provision-cluster.yml`, intactos):
+
+| Workflow | Gatilho | O que faz |
+|---|---|---|
+| `ci.yml` | Pull Request | `ruff check src/ tests/` + `pytest` (offline) |
+| `model-release.yml` | Push na `main` (pipeline/modelos) · manual | `dvc pull` (S3) → `dvc repro` → **atualiza o modelo no MLflow** (alias `@production`) → `dvc push` |
+| `deploy-api.yml` | Push na `main` (api/Dockerfile/k8s) · manual | build+push da imagem (Docker Hub) → `kubectl apply -k k8s/api` no EKS → rollout + rollback |
+
+### Dados de treino no CI (remote DVC em S3)
+
+O `model-release` treina no dado real, versionado por DVC em S3
+(`s3://arcobridgegitops-models-*/dvc`). Configuração **única** na sua máquina:
+
+```bash
+# 1. Baixe os CSVs do Instacart (Kaggle) para data/raw/
+# 2. Publique dados + artefatos no S3 e atualize o dvc.lock
+bash scripts/setup_dvc_s3.sh
+git add dvc.lock && git commit -m "chore: publicar dados no remote S3"
+```
+
+### Secrets / variables necessários
+
+| Nome | Tipo | Uso |
+|---|---|---|
+| `AWS_ROLE_ARN` | variable | OIDC para EKS e S3 (já usado pelo `deploy.yml`) |
+| `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` | secret | Push da imagem da API |
+| `RECSYS_MLFLOW_TRACKING_URI` | secret (opcional) | Sobrescreve o servidor MLflow (default: externo) |
+
+---
+
 ## Arquitetura e Design Patterns
 
 ### Factory Pattern
-Usado em `src/models/model_loader.py` para instanciar diferentes tipos de modelos.
+Usado em `src/models/model_loader.py` (`ModelFactory`) para registrar e instanciar
+diferentes recomendadores pelo nome, desacoplando o engine do tipo de modelo.
 
 ### Strategy Pattern
-Usado em `src/api/services/preprocessing_service.py` para diferentes estratégias de pré-processamento.
+Usado em `src/api/services/enrichment.py` para alternar estratégias de
+enriquecimento da resposta (`IdOnlyStrategy` vs `WithNamesStrategy`), selecionadas
+em tempo de requisição pela flag `enrich_names`.
 
 ### Dependency Injection
-FastAPI dependencies para injeção de services em endpoints.
+FastAPI `Depends` injeta o engine e o mapa de nomes nos endpoints
+(`src/api/dependencies.py`).
 
 ---
 
@@ -228,11 +273,35 @@ Os 5 modelos foram treinados e avaliados no mesmo split de teste interno (15% do
 
 ### Por que o Item-based CF foi escolhido como melhor modelo
 
-O **Item-based CF** foi promovido a `Production` no MLflow Model Registry por obter o melhor `Recall@10` e `NDCG@10` entre os 5 modelos — as métricas mais relevantes para o problema (cobertura do que o usuário de fato recompra e qualidade do ranking), além de aliar o segundo melhor `Coverage@10` (80,73% do catálogo é recomendado em algum momento, evitando recomendar sempre os mesmos itens populares) com baixíssima latência de inferência (0,08 ms/usuário) e tamanho de modelo modesto (29 MB).
+O **Item-based CF** foi promovido via alias `@production` no MLflow Model Registry por obter o melhor `Recall@10` e `NDCG@10` entre os 5 modelos — as métricas mais relevantes para o problema (cobertura do que o usuário de fato recompra e qualidade do ranking), além de aliar o segundo melhor `Coverage@10` (80,73% do catálogo é recomendado em algum momento, evitando recomendar sempre os mesmos itens populares) com baixíssima latência de inferência (0,08 ms/usuário) e tamanho de modelo modesto (29 MB).
 
-A rede neural (**NCF**, modelo principal exigido em PyTorch pelo Tech Challenge) foi implementada com embeddings de usuário/item + MLP, random search de hiperparâmetros e early stopping, mas **não superou os baselines de Collaborative Filtering** neste dataset — ficou no mesmo nível do baseline ingênuo de popularidade. A causa raiz está documentada em [`docs/NOTEBOOKS.md`](docs/NOTEBOOKS.md) (seção 7.3): o Instacart tem um viés de recompra muito forte (os mesmos produtos voltam a ser comprados repetidamente), um padrão que a similaridade de co-ocorrência item-a-item captura diretamente, enquanto a rede neural precisa aprendê-lo a partir de amostragem negativa e poucos dados — exigindo mais dados, épocas ou capacidade do modelo para superar técnicas clássicas mais simples nesse cenário. Por isso, o `ncf_recommender` permanece registrado em `Staging`: implementado, comparado e documentado conforme exigido, mas não promovido por desempenho inferior aos baselines.
+A rede neural (**NCF**, modelo principal exigido em PyTorch pelo Tech Challenge) foi implementada com embeddings de usuário/item + MLP, random search de hiperparâmetros e early stopping, mas **não superou os baselines de Collaborative Filtering** neste dataset — ficou no mesmo nível do baseline ingênuo de popularidade. A causa raiz está documentada em [`docs/NOTEBOOKS.md`](docs/NOTEBOOKS.md) (seção 7.3): o Instacart tem um viés de recompra muito forte (os mesmos produtos voltam a ser comprados repetidamente), um padrão que a similaridade de co-ocorrência item-a-item captura diretamente, enquanto a rede neural precisa aprendê-lo a partir de amostragem negativa e poucos dados — exigindo mais dados, épocas ou capacidade do modelo para superar técnicas clássicas mais simples nesse cenário. Por isso, apenas o Item-based CF recebe o alias `@production`: a NCF foi implementada, comparada e documentada conforme exigido, mas não promovida por desempenho inferior aos baselines.
 
 ---
+
+## Bônus — Opção 2: Deploy em Kubernetes com KServe/EKS
+
+Além do serving principal (FastAPI + Docker acima), o projeto inclui, **como
+segunda opção / bônus**, uma infraestrutura declarativa para servir o modelo em
+um cluster **Kubernetes (EKS)** via **KServe**, com CI/CD por GitHub Actions
+(OIDC), Ingress ALB e certificado TLS.
+
+| Componente | Onde |
+|---|---|
+| Cluster EKS declarativo (eksctl) | `cluster/cluster.yaml` |
+| Plataforma (cert-manager, AWS LB Controller, KServe) | `platform/` + `scripts/deploy.sh` |
+| Modelo demo (sklearn/Iris, formato nativo) | `models/sklearn-iris/` |
+| **Predictor do recomendador (custom container)** | `models/recsys/` |
+| CI/CD (provision, deploy, destroy) | `.github/workflows/` |
+
+O predictor em `models/recsys/` empacota o **mesmo `RecommendationEngine`** da API
+(modelo Production, item-based CF) como um *custom container* KServe — ver
+[`models/recsys/README.md`](models/recsys/README.md).
+
+> **Observações:** (1) é um caminho **alternativo** ao exigido (Docker/DVC/MLflow),
+> não um substituto. (2) Os valores de AWS (conta, VPC, bucket, domínio) são
+> parametrizáveis por ambiente (`.env` / variáveis do CI), com os defaults da PoC
+> original. (3) Requer uma conta AWS e um cluster para ser exercitado de verdade.
 
 ## Contribuindo
 

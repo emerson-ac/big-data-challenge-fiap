@@ -1,0 +1,103 @@
+name: Deploy API
+
+# Build da imagem da API (FastAPI) no Docker Hub e deploy no EKS (kubectl).
+# Reaproveita a Deployment declarativa em k8s/api e o cluster arcobridgegitops.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/api/**"
+      - "src/models/**"
+      - "src/serving/**"
+      - "src/config.py"
+      - "Dockerfile"
+      - "k8s/api/**"
+      - "pyproject.toml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write     # OIDC para assumir role AWS (acesso ao EKS)
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER: arcobridgegitops
+  NAMESPACE: models
+  DEPLOYMENT: recsys-api
+
+jobs:
+  deploy:
+    name: Build & Deploy API
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir tag da imagem
+        id: img
+        run: |
+          IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/recsys-api"
+          echo "image=${IMAGE}"        >> $GITHUB_OUTPUT
+          echo "tag=${IMAGE}:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      # ── 1. Build & push (Docker Hub) ────────────────────────────────────
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build e push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.img.outputs.tag }}
+            ${{ steps.img.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── 2. Deploy no EKS ────────────────────────────────────────────────
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Atualizar kubeconfig
+        run: aws eks update-kubeconfig --name "$CLUSTER" --region "$AWS_REGION"
+
+      - name: Aplicar manifests (Service/Ingress/HPA/Deployment)
+        run: kubectl apply -k k8s/api
+
+      - name: Atualizar imagem e aguardar rollout
+        id: rollout
+        run: |
+          kubectl -n "$NAMESPACE" set image \
+            deployment/"$DEPLOYMENT" api=${{ steps.img.outputs.tag }}
+          kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT" --timeout=300s
+
+      - name: URL pública (ALB) — best-effort
+        if: success()
+        run: |
+          HOST=$(kubectl -n "$NAMESPACE" get ingress "$DEPLOYMENT" \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          echo "ALB: ${HOST:-(ainda provisionando)}" >> $GITHUB_STEP_SUMMARY
+
+      # ── 3. Rollback se o rollout falhar ─────────────────────────────────
+      - name: Rollback
+        if: failure() && steps.rollout.outcome == 'failure'
+        run: |
+          echo "Rollout falhou — revertendo para a revisão anterior."
+          kubectl -n "$NAMESPACE" rollout undo deployment/"$DEPLOYMENT"
+          kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT" --timeout=180s

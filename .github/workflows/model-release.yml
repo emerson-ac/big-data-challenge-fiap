@@ -1,0 +1,80 @@
+name: Model Release
+
+# Retreina o pipeline com os dados reais (S3/DVC) e atualiza o modelo no MLflow
+# externo (promoção via alias @production). Dispara em mudanças no pipeline/modelos.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/pipeline/**"
+      - "src/models/**"
+      - "src/serving/**"
+      - "configs/**"
+      - "dvc.yaml"
+      - "dvc.lock"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write     # OIDC para assumir role AWS (dvc pull/push no S3)
+  contents: read
+
+# Serializa: evita duas promoções concorrentes do mesmo modelo no Registry.
+concurrency:
+  group: model-release
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  AWS_REGION: us-east-1
+
+jobs:
+  train-register:
+    name: Treinar & Registrar no MLflow
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    env:
+      # Nosso código lê RECSYS_MLFLOW_TRACKING_URI (Pydantic Settings).
+      RECSYS_MLFLOW_TRACKING_URI: ${{ secrets.RECSYS_MLFLOW_TRACKING_URI || 'https://mlflow.pocsarcotech.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Baixar dados/artefatos do S3 (DVC)
+        run: uv run dvc pull -r s3remote
+
+      - name: Reproduzir pipeline (preprocess -> train -> evaluate -> @production)
+        run: uv run dvc repro
+
+      - name: Publicar artefatos atualizados no S3 (DVC)
+        run: uv run dvc push -r s3remote
+
+      - name: Resumo de métricas
+        run: |
+          echo "## Comparação de modelos" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat models/evaluation/metrics_comparison.csv >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload artefatos do modelo
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts-${{ github.sha }}
+          path: |
+            models/**/metrics.json
+            models/evaluation/metrics_comparison.csv
+            models/MODEL_CARD.md
+          retention-days: 30
