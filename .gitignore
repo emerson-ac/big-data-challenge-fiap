@@ -56,7 +56,8 @@ data/raw/*.csv
 
 # Modelos Treinados
 # Artefatos binarios sao gerados pelo pipeline DVC (dvc.yaml, cache: false)
-# e versionados no git junto do dvc.lock.
+# e versionados no git junto do dvc.lock. MLflow tracking fica em mlruns/.
+mlruns/
 
 # MLflow
 mlruns/
