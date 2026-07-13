@@ -1,4 +1,4 @@
-"""Recomendador de popularidade — fallback para cold-start."""
+"""Popularity recommender — cold-start fallback."""
 
 import pickle
 from pathlib import Path
@@ -7,13 +7,13 @@ import numpy as np
 
 
 class PopularityRecommender:
-    """Recomendador baseado em ranking global de popularidade.
+    """Recommender based on the global popularity ranking.
 
-    Usado como fallback para usuários sem histórico de interações
-    (cold-start), pois não depende de um usuário específico.
+    Used as a fallback for users with no interaction history (cold-start),
+    since it does not depend on a specific user.
 
     Args:
-        ranking: Array de item_idx ordenado do mais para o menos popular.
+        ranking: Array of item_idx ordered from most to least popular.
     """
 
     def __init__(self, ranking: np.ndarray) -> None:
@@ -21,25 +21,25 @@ class PopularityRecommender:
 
     @classmethod
     def load(cls, ranking_path: Path) -> "PopularityRecommender":
-        """Carrega o ranking de popularidade persistido.
+        """Loads the persisted popularity ranking.
 
         Args:
-            ranking_path: Caminho do pickle com o ranking de item_idx.
+            ranking_path: Path to the pickle holding the item_idx ranking.
 
         Returns:
-            Instância pronta para recomendar.
+            Instance ready to recommend.
         """
         with open(ranking_path, "rb") as f:
             ranking = pickle.load(f)
         return cls(np.asarray(ranking))
 
     def top_k(self, k: int) -> list[int]:
-        """Retorna os k itens mais populares.
+        """Returns the k most popular items.
 
         Args:
-            k: Tamanho do top-k.
+            k: Top-k size.
 
         Returns:
-            Lista de item_idx, do mais para o menos popular.
+            List of item_idx, from most to least popular.
         """
         return self._ranking[:k].tolist()

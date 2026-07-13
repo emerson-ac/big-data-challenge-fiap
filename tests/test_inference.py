@@ -1,4 +1,4 @@
-"""Testes da camada de predição (RecommendationEngine)."""
+"""Tests for the prediction layer (RecommendationEngine)."""
 
 from src.models.inference import (
     Recommendation,
@@ -8,7 +8,7 @@ from src.models.inference import (
 
 
 def _build_engine(model_artifacts: dict) -> RecommendationEngine:
-    """Instancia o RecommendationEngine com artefatos sintéticos de teste."""
+    """Instantiates the RecommendationEngine with synthetic test artifacts."""
     return RecommendationEngine(
         similarity_path=model_artifacts["similarity_path"],
         interactions_path=model_artifacts["interactions_path"],
@@ -18,14 +18,14 @@ def _build_engine(model_artifacts: dict) -> RecommendationEngine:
 
 
 def test_load_vocabularies_returns_expected_keys(model_artifacts: dict) -> None:
-    """load_vocabularies restaura o dicionário de mapas persistido."""
+    """load_vocabularies restores the persisted mapping dictionary."""
     vocab = load_vocabularies(model_artifacts["vocab_path"])
 
     assert vocab["user_id_to_idx"] == {10: 0, 20: 1}
 
 
 def test_recommend_known_user_uses_model_scores(model_artifacts: dict) -> None:
-    """Usuário conhecido recebe recomendações ranqueadas pelo score do modelo."""
+    """A known user receives recommendations ranked by the model score."""
     engine = _build_engine(model_artifacts)
 
     recommendations = engine.recommend(user_id=10, k=2)
@@ -39,7 +39,7 @@ def test_recommend_known_user_uses_model_scores(model_artifacts: dict) -> None:
 def test_recommend_unknown_user_falls_back_to_popularity(
     model_artifacts: dict,
 ) -> None:
-    """Usuário desconhecido (cold-start) recebe o ranking de popularidade."""
+    """An unknown user (cold-start) receives the popularity ranking."""
     engine = _build_engine(model_artifacts)
 
     recommendations = engine.recommend(user_id=999, k=2)
@@ -51,7 +51,7 @@ def test_recommend_unknown_user_falls_back_to_popularity(
 
 
 def test_recommend_respects_k(model_artifacts: dict) -> None:
-    """O número de recomendações retornadas respeita o parâmetro k."""
+    """The number of returned recommendations respects the k parameter."""
     engine = _build_engine(model_artifacts)
 
     recommendations = engine.recommend(user_id=10, k=1)

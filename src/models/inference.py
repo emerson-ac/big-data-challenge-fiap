@@ -1,4 +1,4 @@
-"""Predição de recomendações: ponto de entrada usado pelo serviço/API."""
+"""Recommendation prediction: entrypoint used by the service/API."""
 
 import pickle
 from dataclasses import dataclass
@@ -22,12 +22,12 @@ DEFAULT_VOCAB_PATH = Path("data/processed/vocabularies.pkl")
 
 @dataclass(frozen=True)
 class Recommendation:
-    """Item recomendado com posição e score.
+    """A recommended item with its position and score.
 
     Attributes:
-        product_id: Identificador externo do produto.
-        score: Score de afinidade calculado pelo modelo.
-        rank: Posição no ranking (1-based).
+        product_id: External product identifier.
+        score: Affinity score computed by the model.
+        rank: Position in the ranking (1-based).
     """
 
     product_id: int
@@ -36,27 +36,27 @@ class Recommendation:
 
 
 def load_vocabularies(vocab_path: Path = DEFAULT_VOCAB_PATH) -> dict[str, Any]:
-    """Carrega o dicionário de vocabulários (mapas usuário/produto <-> índice).
+    """Loads the vocabulary map (user/product <-> index).
 
     Args:
-        vocab_path: Caminho do pickle de vocabulários.
+        vocab_path: Path to the vocabulary pickle.
 
     Returns:
-        Dicionário com as chaves user_id_to_idx, idx_to_product_id, etc.
+        Dictionary with user_id_to_idx, idx_to_product_id, etc.
     """
     with open(vocab_path, "rb") as f:
         return pickle.load(f)
 
 
 class RecommendationEngine:
-    """Orquestra o modelo Production e o fallback de popularidade.
+    """Orchestrates the Production model and the popularity fallback.
 
     Args:
-        model_type: Nome do modelo registrado na ModelFactory.
-        similarity_path: Caminho do artefato de similaridade item-item.
-        interactions_path: Caminho do histórico de compras (sparse).
-        popularity_path: Caminho do ranking de popularidade (fallback cold-start).
-        vocab_path: Caminho dos vocabulários de usuário/produto.
+        model_type: Name of the model registered in ModelFactory.
+        similarity_path: Path to the item-item similarity artifact.
+        interactions_path: Path to the purchase history (sparse).
+        popularity_path: Path to the popularity ranking (cold-start fallback).
+        vocab_path: Path to the user/product vocabularies.
     """
 
     def __init__(
@@ -93,14 +93,14 @@ class RecommendationEngine:
         return len(self._vocab["idx_to_product_id"])
 
     def recommend(self, user_id: int, k: int = 10) -> list[Recommendation]:
-        """Gera o top-k de recomendações para um usuário externo.
+        """Generates the top-k recommendations for an external user.
 
         Args:
-            user_id: ID externo do usuário (ex.: user_id do Instacart).
-            k: Quantidade de recomendações desejadas.
+            user_id: External user id (e.g. Instacart user_id).
+            k: Number of recommendations desired.
 
         Returns:
-            Lista de Recommendation ordenada por score decrescente.
+            List of Recommendation ordered by descending score.
         """
         user_idx = self._vocab["user_id_to_idx"].get(user_id)
         if user_idx is None:
@@ -110,7 +110,7 @@ class RecommendationEngine:
         return self._build_recommendations(scores, k)
 
     def _recommend_popular(self, k: int) -> list[Recommendation]:
-        """Constrói recomendações a partir do ranking de popularidade."""
+        """Builds recommendations from the popularity ranking."""
         item_indices = self._fallback.top_k(k)
         idx_to_product_id = self._vocab["idx_to_product_id"]
         return [
@@ -123,7 +123,7 @@ class RecommendationEngine:
     def _build_recommendations(
         self, scores: np.ndarray, k: int
     ) -> list[Recommendation]:
-        """Converte um vetor de scores em uma lista ranqueada de Recommendation."""
+        """Turns a score vector into a ranked list of Recommendation."""
         top_items = top_k_from_scores(scores, k)
         idx_to_product_id = self._vocab["idx_to_product_id"]
         return [

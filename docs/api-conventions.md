@@ -1,5 +1,10 @@
 # Convenções de API - Sistema de Recomendação
 
+> **Status:** documento de design alvo (forward-looking). A API REST ainda **não** foi
+> implementada; esta é a especificação de referência para uma etapa futura. Os
+> componentes atualmente implementados estão em `src/` (modelos, pré-processamento,
+> inferência).
+
 Documento que padroniza a estrutura, nomeação, validação e tratamento de erros para a API REST de recomendação de produtos.
 
 ---
@@ -57,36 +62,36 @@ from typing import Optional
 
 class APISettings(BaseSettings):
     """Configurações da API via variáveis de ambiente."""
-    
+
     app_name: str = "Recommendation API"
     app_version: str = "1.0.0"
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
-    
+
     # Modelos
     model_path: str = "models/neural_network/model.pt"
     device: str = "cpu"  # ou "cuda"
-    
+
     # MLflow
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment_name: str = "recommendation_api"
-    
+
     # Logging
     log_level: str = "INFO"
     structlog_format: str = "json"
-    
+
     # Cache
     cache_ttl_seconds: int = 3600
     enable_cache: bool = True
-    
+
     # Rate Limiting
     rate_limit_requests: int = 100
     rate_limit_window_seconds: int = 60
-    
+
     # Random Seed
     random_seed: int = 42
-    
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -186,7 +191,7 @@ from typing import Optional, List
 
 class RecommendationRequest(BaseModel):
     """Schema de requisição para recomendações.
-    
+
     Attributes:
         user_id: ID do usuário (inteiro positivo)
         top_k: Número de recomendações desejadas (padrão: 5)
@@ -197,7 +202,7 @@ class RecommendationRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=100, description="Quantidade de recomendações")
     exclude_items: Optional[List[int]] = Field(None, description="Itens a excluir")
     min_score_threshold: Optional[float] = Field(0.0, ge=0.0, le=1.0)
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -207,7 +212,7 @@ class RecommendationRequest(BaseModel):
                 "min_score_threshold": 0.3
             }
         }
-    
+
     @validator("top_k")
     def validate_top_k(cls, v):
         """Valida que top_k não é muito grande."""
@@ -227,7 +232,7 @@ from datetime import datetime
 
 class RecommendationItem(BaseModel):
     """Item individual na recomendação.
-    
+
     Attributes:
         product_id: ID do produto
         score: Score de recomendação (0-1)
@@ -239,7 +244,7 @@ class RecommendationItem(BaseModel):
 
 class RecommendationResponse(BaseModel):
     """Response de recomendações.
-    
+
     Attributes:
         user_id: ID do usuário
         recommendations: Lista de recomendações
@@ -252,7 +257,7 @@ class RecommendationResponse(BaseModel):
     model_version: str
     timestamp: datetime
     processing_time_ms: float
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -269,7 +274,7 @@ class RecommendationResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Schema de erro padrão.
-    
+
     Attributes:
         error_code: Código de erro interno
         message: Mensagem descritiva
@@ -293,7 +298,7 @@ class ErrorResponse(BaseModel):
 ```python
 class APIException(Exception):
     """Exceção base da API."""
-    
+
     def __init__(self, error_code: str, message: str, details: dict = None):
         self.error_code = error_code
         self.message = message
@@ -350,7 +355,7 @@ async def api_exception_handler(request: Request, exc: APIException):
         details=exc.details,
         path=request.url.path
     )
-    
+
     return JSONResponse(
         status_code=400,
         content={
@@ -368,7 +373,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         path=request.url.path,
         exception=str(exc)
     )
-    
+
     return JSONResponse(
         status_code=500,
         content={
@@ -397,7 +402,7 @@ logger = get_logger()
 @router.get("/status")
 async def health_check():
     """Verifica se a API está operacional.
-    
+
     Returns:
         dict: Status da API e informações de saúde
     """
@@ -431,35 +436,35 @@ async def get_recommendations(
     service: RecommendationService = Depends()
 ):
     """Gera recomendações para um usuário.
-    
+
     Args:
         request: Schema de requisição com user_id e parâmetros
         service: Serviço de recomendação (injeção de dependência)
-    
+
     Returns:
         RecommendationResponse: Recomendações com score e ranking
-    
+
     Raises:
         HTTPException: Se usuário não encontrado ou erro no modelo
     """
     start_time = time.time()
-    
+
     logger.info(
         "recommendation_request_received",
         user_id=request.user_id,
         top_k=request.top_k
     )
-    
+
     recommendations = await service.get_recommendations(request)
     processing_time_ms = (time.time() - start_time) * 1000
-    
+
     logger.info(
         "recommendations_generated",
         user_id=request.user_id,
         count=len(recommendations),
         processing_time_ms=round(processing_time_ms, 2)
     )
-    
+
     return RecommendationResponse(
         user_id=request.user_id,
         recommendations=recommendations,
@@ -483,18 +488,18 @@ from abc import ABC, abstractmethod
 
 class ModelFactory:
     """Factory Pattern para carregar diferentes modelos.
-    
+
     Implementa o padrão Factory para abstrair a criação e
     carregamento de diferentes tipos de modelos de ML.
     """
-    
+
     _models = {}
-    
+
     @classmethod
     def register(cls, name: str, model_class):
         """Registra um novo tipo de modelo."""
         cls._models[name] = model_class
-    
+
     @classmethod
     def create(cls, model_type: str, **kwargs):
         """Cria e retorna uma instância do modelo."""
@@ -529,14 +534,14 @@ logger = get_logger()
 
 class RecommendationService:
     """Service para gerar recomendações.
-    
+
     Implementa a lógica de negócio para recomendações,
     incluindo carregamento de modelos e processamento de requisições.
     """
-    
+
     def __init__(self):
         self.model = self._load_model()
-    
+
     def _load_model(self):
         """Carrega o modelo via Factory."""
         try:
@@ -544,19 +549,19 @@ class RecommendationService:
         except Exception as e:
             logger.error("model_loading_failed", reason=str(e))
             raise ModelNotLoadedError(str(e))
-    
+
     async def get_recommendations(
         self,
         request: RecommendationRequest
     ) -> list[RecommendationItem]:
         """Gera recomendações para um usuário.
-        
+
         Args:
             request: Requisição com parâmetros de recomendação
-        
+
         Returns:
             Lista de itens recomendados com scores
-        
+
         Raises:
             UserNotFoundError: Se usuário não existe nos dados
             ModelNotLoadedError: Se modelo não está disponível
@@ -564,10 +569,10 @@ class RecommendationService:
         # Validação de usuário
         if not self._user_exists(request.user_id):
             raise UserNotFoundError(request.user_id)
-        
+
         # Geração de recomendações
         scores = self.model.predict(request.user_id)
-        
+
         # Filtragem e ranking
         recommendations = self._process_recommendations(
             scores,
@@ -575,14 +580,14 @@ class RecommendationService:
             request.exclude_items,
             request.min_score_threshold
         )
-        
+
         return recommendations
-    
+
     def _user_exists(self, user_id: int) -> bool:
         """Verifica se usuário existe nos dados."""
         # Implementação específica do projeto
         return True
-    
+
     def _process_recommendations(
         self,
         scores: dict,
@@ -591,26 +596,26 @@ class RecommendationService:
         min_score: float = 0.0
     ) -> list[RecommendationItem]:
         """Processa scores em recomendações ranqueadas.
-        
+
         Args:
             scores: Dicionário {item_id: score}
             top_k: Quantidade de recomendações
             exclude_items: IDs a excluir
             min_score: Score mínimo
-        
+
         Returns:
             Lista de RecommendationItem ordenada por score
         """
         exclude_set = set(exclude_items or [])
-        
+
         filtered = [
             (item_id, score)
             for item_id, score in scores.items()
             if item_id not in exclude_set and score >= min_score
         ]
-        
+
         ranked = sorted(filtered, key=lambda x: x[1], reverse=True)[:top_k]
-        
+
         return [
             RecommendationItem(
                 product_id=item_id,
@@ -671,9 +676,9 @@ async def lifespan(app: FastAPI):
     logger.info("application_startup", version=settings.app_version)
     np.random.seed(settings.random_seed)
     torch.manual_seed(settings.random_seed)
-    
+
     yield
-    
+
     # Shutdown
     logger.info("application_shutdown")
 
@@ -730,17 +735,17 @@ def process_user_data(
     items: list[int]
 ) -> dict[str, float]:
     """Processa dados de usuário para recomendação.
-    
+
     Realiza validação, normalização e extração de features
     do usuário para alimentar o modelo de recomendação.
-    
+
     Args:
         user_id: ID único do usuário (positivo)
         items: Lista de IDs de itens comprados
-    
+
     Returns:
         Dicionário com features normalizadas do usuário
-    
+
     Raises:
         ValueError: Se user_id é inválido
         KeyError: Se items contém IDs não conhecidos

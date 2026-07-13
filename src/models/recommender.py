@@ -1,4 +1,4 @@
-"""Interface comum para modelos de recomendação (Interface Segregation)."""
+"""Common interface for recommendation models (Interface Segregation)."""
 
 from typing import Protocol
 
@@ -6,15 +6,15 @@ import numpy as np
 
 
 class Recommender(Protocol):
-    """Contrato mínimo de um modelo capaz de pontuar itens para um usuário."""
+    """Minimal contract for a model that can score items for a user."""
 
     def score_user(self, user_idx: int) -> np.ndarray:
-        """Calcula o vetor denso de scores por item para um usuário conhecido.
+        """Computes the dense per-item score vector for a known user.
 
         Args:
-            user_idx: Índice interno do usuário.
+            user_idx: Internal user index.
 
         Returns:
-            Vetor numpy de scores, shape (n_items,).
+            Numpy score vector, shape (n_items,).
         """
         ...
