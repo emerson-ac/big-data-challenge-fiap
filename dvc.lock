@@ -166,9 +166,9 @@ stages:
     outs:
     - path: models/MODEL_CARD.md
       hash: md5
-      md5: c000aaf51b19b19d754743d0a5eb95ad
+      md5: d1d5bdb4458daf8d4f51284f85d25484
       size: 1640
     - path: models/evaluation/metrics_comparison.csv
       hash: md5
-      md5: e720b35f727df611704c25a3d0646290
+      md5: 006dbd244e74abbe2ea11fae2ed0dff6
       size: 448
