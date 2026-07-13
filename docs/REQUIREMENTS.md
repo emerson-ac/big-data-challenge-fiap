@@ -70,13 +70,13 @@
 
 ## 6. Entregáveis Finais
 
-- [ ] **Repositório GitHub:** 
+- [ ] **Repositório GitHub:**
   - [ ] Código completo versionado.
   - [ ] `.gitignore` configurado.
   - [ ] `.dockerignore` configurado.
   - [ ] Pipeline DVC funcional e reprodutível.
   - [ ] README detalhado com instruções de uso.
-  
+
 - [ ] **Vídeo STAR:**
   - [ ] Duração: Até 5 minutos.
   - [ ] Método: Situação → Tarefa → Ação → Resultado.
