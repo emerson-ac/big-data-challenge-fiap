@@ -15,7 +15,7 @@ from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RANDOM_SEED = 42
-REQUIRED_PACKAGES = ("torch", "sklearn", "mlflow", "pandas", "numpy")
+REQUIRED_PACKAGES = ("torch", "sklearn", "mlflow", "dvc", "pandas", "numpy")
 
 
 class Settings(BaseSettings):

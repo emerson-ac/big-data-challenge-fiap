@@ -50,14 +50,14 @@ htmlcov/
 
 # Dataset e Dados
 data/raw/*.csv
-data/processed/
 !data/raw/.gitkeep
-!data/processed/.gitkeep
+# data/processed e gerado pelo pipeline DVC (dvc.yaml, cache: false) e
+# versionado no git junto do dvc.lock.
 
 # Modelos Treinados
-models/**/*.pt
-models/**/*.pkl
-models/**/*.joblib
+# Artefatos binarios sao gerados pelo pipeline DVC (dvc.yaml, cache: false)
+# e versionados no git junto do dvc.lock. MLflow tracking fica em mlruns/.
+mlruns/
 
 # MLflow
 mlruns/

@@ -1,0 +1,10 @@
+{
+  "random_seed": 42,
+  "top_n_products": 3000,
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "n_items_catalog": 200,
+  "catalog_coverage": 1.0,
+  "dataset_hash": "ad3c4f16d15ed60d83cd30f34d58ed09933b7cca307f47e7ed942f8d0bbc01f4"
+}
