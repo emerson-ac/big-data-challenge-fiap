@@ -1,0 +1,220 @@
+"""Pipeline stage 3: comparative evaluation and model card generation.
+
+Ports ``notebooks/08_model_comparison.ipynb``: rebuilds the 5 models, compares
+metrics on the test split, and writes ``metrics_comparison.csv`` plus
+``MODEL_CARD.md``.
+
+Usage:
+    uv run python -m src.pipeline.evaluate
+"""
+
+import json
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import scipy.sparse as sp
+import structlog
+import torch
+
+from src.config import get_settings
+from src.evaluation.metrics import (
+    coverage_at_k,
+    evaluate_recommendations,
+    hit_rate_at_k,
+)
+from src.evaluation.ranking import recommendations_from_score_matrix
+from src.models.ncf import NeuralCollaborativeFiltering, score_all_items
+from src.models.training.data import load_processed
+from src.models.training.user_cf import build_recommendations
+from src.pipeline.common import load_config, set_seed
+
+logger = structlog.get_logger()
+
+
+def _score_recs(score_matrix: np.ndarray, users: list[int], k: int) -> dict:
+    """Builds top-k recommendations from a dense score matrix."""
+    return recommendations_from_score_matrix(users, score_matrix, k)
+
+
+def _popularity_recs(models_dir: Path, users: list[int], k: int) -> dict:
+    """Popularity baseline recommendations (same top-k for everyone)."""
+    import pickle
+
+    with open(models_dir / "baseline_popularity" / "ranking.pkl", "rb") as f:
+        ranking = pickle.load(f)
+    return {u: ranking[:k].tolist() for u in users}
+
+
+def _item_cf_recs(models_dir, interactions, users, k) -> dict:
+    """Item-based CF recommendations (history dot similarity)."""
+    similarity = sp.load_npz(models_dir / "item_based_cf" / "item_similarity.npz")
+    return _score_recs(interactions[users].dot(similarity).toarray(), users, k)
+
+
+def _mf_recs(models_dir, users, k) -> dict:
+    """Matrix Factorization recommendations (factor product)."""
+    uf = np.load(models_dir / "matrix_factorization" / "user_factors.npy")
+    it = np.load(models_dir / "matrix_factorization" / "item_factors.npy")
+    return _score_recs(uf[users] @ it.T, users, k)
+
+
+def _user_cf_recs(models_dir, interactions, users, k) -> dict:
+    """User-based CF recommendations (KNN over the pool)."""
+    import pickle
+
+    with open(models_dir / "user_based_cf" / "knn_model.pkl", "rb") as f:
+        bundle = pickle.load(f)
+    pool_matrix = interactions[bundle["pool_indices"]]
+    n_neighbors = min(bundle["model"].n_neighbors, pool_matrix.shape[0])
+    return build_recommendations(
+        users, bundle["model"], pool_matrix, interactions, n_neighbors, k
+    )
+
+
+def _ncf_recs(models_dir, interactions, users, k) -> dict:
+    """NCF recommendations (PyTorch neural network)."""
+    with open(models_dir / "neural_network" / "metrics.json", encoding="utf-8") as f:
+        params = json.load(f)["params"]
+    model = NeuralCollaborativeFiltering(
+        interactions.shape[0],
+        interactions.shape[1],
+        params["embedding_dim"],
+        tuple(params["hidden_dims"]),
+    )
+    model.load_state_dict(torch.load(models_dir / "neural_network" / "model.pt"))
+    return _score_recs(
+        score_all_items(model, users, interactions.shape[1], batch_size=200), users, k
+    )
+
+
+def _dir_size_mb(path: Path, patterns: list[str]) -> float:
+    """Sums the size (MB) of a model's artifacts."""
+    total = sum(f.stat().st_size for pat in patterns for f in path.glob(pat))
+    return round(total / (1024 * 1024), 4)
+
+
+def _timed(fn, *args) -> tuple[dict, float]:
+    """Runs a recs builder measuring the average per-user latency (ms)."""
+    start = time.perf_counter()
+    recs = fn(*args)
+    elapsed_ms = (time.perf_counter() - start) * 1000 / max(len(recs), 1)
+    return recs, round(elapsed_ms, 4)
+
+
+def _row(
+    recs: dict, gt: dict, n_items: int, k: int, size_mb: float, latency_ms: float
+) -> dict:
+    """Assembles a comparison-table row with all metrics."""
+    metrics = evaluate_recommendations(recs, gt, k)
+    metrics["hit_rate_at_k"] = hit_rate_at_k(recs, gt, k)
+    metrics["coverage_at_k"] = coverage_at_k(recs, n_items, k)
+    metrics["inference_latency_ms"] = latency_ms
+    metrics["model_size_mb"] = size_mb
+    return metrics
+
+
+def _model_row(recs, gt, n_items, k, model_dir, patterns, lat) -> dict:
+    """Assembles a comparison row from recs, artifact size and latency."""
+    return _row(recs, gt, n_items, k, _dir_size_mb(model_dir, patterns), lat)
+
+
+def _prep(interactions, gt) -> tuple:
+    """Returns (n_items, users, sample) for the test-split evaluation."""
+    n_items = interactions.shape[1]
+    users = list(gt.keys())
+    return n_items, users, users[: min(3000, len(users))]
+
+
+def _add_row(rows, name, recs_fn, gt, ctx):
+    """Times a recs builder and appends its comparison row to ``rows``."""
+    sub, patterns = _MODEL_DIRS[name]
+    recs, lat = _timed(recs_fn)
+    md = ctx["md"]
+    rows[name] = _model_row(recs, gt, ctx["n_items"], ctx["k"], md / sub, patterns, lat)
+
+
+_MODEL_DIRS = {
+    "popularity": ("baseline_popularity", ["*.pkl"]),
+    "item_based_cf": ("item_based_cf", ["*.npz"]),
+    "user_based_cf": ("user_based_cf", ["*.pkl"]),
+    "matrix_factorization": ("matrix_factorization", ["*.npy"]),
+    "ncf": ("neural_network", ["*.pt"]),
+}
+
+
+def _collect_rows(models_dir, interactions, gt, k) -> dict:
+    """Rebuilds the 5 models and collects their comparison rows (test split)."""
+    n_items, users, sample = _prep(interactions, gt)
+    sgt = {u: gt[u] for u in sample}
+    md, it = models_dir, interactions
+    ctx = {"md": md, "n_items": n_items, "k": k}
+    rows: dict[str, dict] = {}
+    _add_row(rows, "popularity", lambda: _popularity_recs(md, users, k), gt, ctx)
+    _add_row(rows, "item_based_cf", lambda: _item_cf_recs(md, it, users, k), gt, ctx)
+    _add_row(rows, "user_based_cf", lambda: _user_cf_recs(md, it, sample, k), sgt, ctx)
+    _add_row(rows, "matrix_factorization", lambda: _mf_recs(md, users, k), gt, ctx)
+    _add_row(rows, "ncf", lambda: _ncf_recs(md, it, users, k), gt, ctx)
+    return rows
+
+
+def _write_model_card(
+    df: pd.DataFrame, best: str, dataset_hash: str, out: Path
+) -> None:
+    """Generates MODEL_CARD.md from the comparison table."""
+    beats_recall = bool(
+        df.loc["ncf", "recall_at_k"] > df.drop("ncf")["recall_at_k"].max()
+    )
+    beats_ndcg = bool(df.loc["ncf", "ndcg_at_k"] > df.drop("ncf")["ndcg_at_k"].max())
+    card = _MODEL_CARD_TEMPLATE.format(
+        hash=dataset_hash[:16],
+        table=df.round(4).to_markdown(),
+        beats_recall=beats_recall,
+        beats_ndcg=beats_ndcg,
+        best=best,
+    )
+    out.write_text(card, encoding="utf-8")
+
+
+def main() -> None:
+    """Runs the comparative evaluation and writes artifacts."""
+    settings = get_settings()
+    config = load_config()
+    set_seed(settings.random_seed)
+    k = config["evaluation"]["k"]
+    models_dir = settings.models_dir
+    data = load_processed(settings.processed_data_dir)
+    rows = _collect_rows(models_dir, data.interactions, data.test_ground_truth, k)
+    df = pd.DataFrame(rows).T.rename_axis("model")
+    best = str(df["recall_at_k"].idxmax())
+    eval_dir = models_dir / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
+    _write_model_card(
+        df, best, data.split_meta["dataset_hash"], models_dir / "MODEL_CARD.md"
+    )
+    logger.info("evaluation_done", best_model=best)
+
+
+_MODEL_CARD_TEMPLATE = """# Model Card - Sistema de Recomendacao Instacart
+
+Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash}...`.
+
+## Metricas (split de teste)
+
+{table}
+
+## Decisao de Promocao
+
+- NCF supera todos os baselines em recall@k: {beats_recall}
+- NCF supera todos os baselines em ndcg@k: {beats_ndcg}
+- Modelo com melhor recall@k: **{best}**
+- Promocao ao MLflow Model Registry ocorre na etapa de serving (Etapa 4).
+
+Gerado automaticamente por `src/pipeline/evaluate.py`.
+"""
+
+
+if __name__ == "__main__":
+    main()
