@@ -1,0 +1,40 @@
+name: CI
+
+# Quality gate on Pull Requests: lint + format + lock check + unit tests.
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint & Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync --group dev
+
+      - name: Lock check
+        run: uv lock --check
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src/ tests/ --output-format=github
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src/ tests/
+
+      - name: Unit tests
+        run: uv run pytest tests/ -v
