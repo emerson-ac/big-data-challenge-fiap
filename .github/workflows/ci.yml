@@ -1,0 +1,68 @@
+name: CI
+
+# Quality gate + pipeline validation on Pull Requests.
+# Aula 3: CI/CD de ML — GitHub Actions roda lint, testes e dvc repro.
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint & Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync --group dev
+
+      - name: Lock check
+        run: uv lock --check
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src/ tests/ --output-format=github
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src/ tests/
+
+      - name: Unit tests
+        run: uv run pytest tests/ -v
+
+  pipeline:
+    name: Pipeline DVC (sintético)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync --group dev
+
+      - name: Gerar dados sintéticos
+        run: uv run python scripts/gen_synthetic_data.py
+
+      - name: Rodar pipeline (dvc repro)
+        run: uv run dvc repro -f
+
+      - name: Validar artefatos
+        run: |
+          test -f models/evaluation/metrics_comparison.csv
+          test -f models/MODEL_CARD.md
+          test -f models/baseline_popularity/metrics.json
+          test -f models/neural_network/model.pt
