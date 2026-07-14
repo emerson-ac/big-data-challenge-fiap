@@ -3,139 +3,100 @@
 ![Python](https://img.shields.io/badge/Python-3.12+-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-red)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.138+-green)
+![DVC](https://img.shields.io/badge/DVC-3.67+-purple)
+![MLflow](https://img.shields.io/badge/MLflow-2.22+-orange)
+![Docker](https://img.shields.io/badge/Docker-multi--stage-blue)
 
 ## Visão Geral
 
-Sistema de recomendação de produtos para e-commerce baseado em comportamento de compra de usuários. Compara 5 modelos (popularidade, item-based CF, user-based CF, matrix factorization e uma rede neural NCF em PyTorch), com experimentos rastreados no MLflow, e expõe o modelo Production via uma API REST (FastAPI).
+Sistema de recomendação de produtos para e-commerce baseado no comportamento de compra de usuários. Compara 5 modelos (popularidade, item-based CF, user-based CF, matrix factorization e rede neural NCF em PyTorch), com pipeline reproduzível via DVC, experimentos rastreados no MLflow, modelo servido via Model Registry e API REST (FastAPI) containerizada com Docker.
 
-**Dataset:** [Instacart Online Grocery Basket Analysis](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset). Os arquivos brutos e processados já estão incluídos em `data/` — não é necessário baixar nada para rodar o projeto.
+**Dataset:** [Instacart Online Grocery Basket Analysis](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset)
 
 ---
 
 ## Status do Projeto
 
-Ver [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) para o checklist completo.
+- [x] **Etapa 1** — Clean Code e Estrutura (SOLID, Factory + Strategy, ≤20 linhas/fn)
+- [x] **Etapa 2** — Ambiente e Dependências (uv, Pydantic Settings, validate_env)
+- [x] **Etapa 3** — DVC + MLflow + Docker (pipeline reproduzível, tracking, container)
+- [x] **Etapa 4** — Model Registry + Serving + CI (alias @production, FastAPI, GitHub Actions)
 
-- [x] **Estrutura:** Diretórios `src/`, `tests/`, `data/`, `models/`, `configs/`
-- [x] **Código:** Funções ≤ 20 linhas, type hints, docstrings Google Style
-- [x] **Padrões:** Factory Pattern (`src/models/model_loader.py`) + Dependency Injection (FastAPI)
-- [x] **Ambiente:** `pyproject.toml` + `uv`, lock file commitado, deps prod/dev separadas
-- [x] **ML:** Baselines Scikit-Learn + rede neural PyTorch (NCF), 8 métricas de avaliação
-- [x] **MLflow:** Tracking de múltiplos runs + Model Registry (`item_based_cf_recommender` em Production)
-- [x] **API:** FastAPI servindo o modelo Production (`src/api/`)
-- [x] **Qualidade:** Ruff sem erros, pre-commit hooks, commits semânticos
-- [ ] **Docker:** Dockerfile/docker-compose ainda não implementados
-- [ ] **DVC:** Dados versionados diretamente no Git por ora; pipeline `dvc.yaml` ainda não implementado
-
----
-
-## Estrutura do Projeto
-
-```
-.
-├── src/
-│   ├── api/                # API REST (FastAPI)
-│   │   ├── main.py         # Aplicação FastAPI (lifespan, exception handlers, rotas)
-│   │   ├── config.py       # Settings via Pydantic (.env)
-│   │   ├── dependencies.py # Injeção de dependências
-│   │   ├── routes/         # health, recommendations
-│   │   ├── schemas/        # request, response, errors (Pydantic)
-│   │   ├── services/       # recommendation_service.py
-│   │   ├── middleware/     # error_handler.py
-│   │   └── utils/          # logger.py (structlog)
-│   ├── models/              # Modelos e camada de inferência
-│   │   ├── inference.py     # RecommendationEngine (ponto de entrada de predição)
-│   │   ├── model_loader.py  # ModelFactory (Factory Pattern)
-│   │   ├── item_based_cf.py # Modelo Production
-│   │   ├── popularity.py    # Fallback de cold-start
-│   │   ├── ncf.py           # Rede neural (PyTorch)
-│   │   └── recommender.py   # Protocol comum
-│   └── evaluation/          # metrics.py, ranking.py (compartilhados pelos notebooks)
-├── tests/                    # Testes unitários e de integração (pytest)
-├── notebooks/                # Pipeline de modelagem, numerado por ordem de execução
-│   ├── 01_eda.ipynb
-│   ├── 02_preprocessing.ipynb
-│   ├── 03_baseline_popularity.ipynb
-│   ├── 04_item_based_cf.ipynb
-│   ├── 05_user_based_cf.ipynb
-│   ├── 06_matrix_factorization.ipynb
-│   ├── 07_ncf_training.ipynb
-│   └── 08_model_comparison.ipynb
-├── data/
-│   ├── raw/                 # Dados brutos do Instacart (já incluídos)
-│   └── processed/           # Dados processados/splits (já incluídos)
-├── models/                   # Artefatos treinados + MODEL_CARD.md
-├── configs/
-│   └── model_config.yaml     # Hiperparâmetros e seeds de cada modelo
-├── mlruns/                    # Tracking store local do MLflow
-├── docs/                      # Documentação de convenções e requisitos
-├── .env.example               # Variáveis de ambiente da API
-├── pyproject.toml              # Dependências e configs (uv)
-└── README.md
-```
-
----
-
-## Stack Tecnológico
-
-| Componente | Tecnologia |
-|-----------|----------|
-| **Linguagem** | Python 3.12+ |
-| **Modelagem** | PyTorch + Scikit-Learn |
-| **API** | FastAPI + Uvicorn |
-| **Rastreamento** | MLflow Tracking + Model Registry |
-| **Gerenciador de Deps** | uv + pyproject.toml |
-| **Linting** | Ruff |
-| **Logging** | Structlog |
-| **Testes** | pytest |
+Checklist completo em [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
 ---
 
 ## Quick Start
 
-### 1. Configurar Ambiente
-
 ```bash
-# Clonar repositório
 git clone https://github.com/emerson-ac/big-data-challenge-fiap.git
 cd big-data-challenge-fiap
 
-# Instalar dependências (cria .venv automaticamente)
-uv sync
-
-# Ativar git hooks de qualidade (ruff, uv lock check)
-uv run pre-commit install
+uv sync                                     # instala ambiente reproduzível (lock)
+cp .env.example .env                        # configura variáveis de ambiente
+uv run python scripts/validate_env.py        # valida Python, deps, seed e .env
+uv run pre-commit install                   # git hooks (ruff + uv-lock)
 ```
 
-### 2. Dados
+---
 
-Os dados brutos (`data/raw/*.csv`) e processados (`data/processed/*`) já estão incluídos no repositório — nenhum download é necessário. Caso queira reprocessar a partir da fonte original, o dataset está disponível em [Kaggle](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset).
+## Pipeline DVC (reproduzível)
 
-### 3. (Opcional) Reexecutar o Pipeline de Modelagem
+O pipeline tem 3 estágios: `preprocess -> train -> evaluate`, declarados em
+[`dvc.yaml`](dvc.yaml) e travados em [`dvc.lock`](dvc.lock).
 
-Os notebooks já foram executados e seus artefatos (`models/`, `mlruns/`) estão commitados — **não é necessário rodá-los para usar a API**. Para reproduzir o treinamento do zero:
+### Dados
+
+Para reproduzir o pipeline do zero, coloque os CSVs do Instacart em `data/raw/`
+(download no [Kaggle](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset)).
+
+Alternativamente, gere um dataset sintético para validar o pipeline em segundos:
 
 ```bash
-uv run jupyter notebook notebooks/
-# Executar em ordem: 01_eda -> 02_preprocessing -> 03_baseline_popularity ->
-# 04_item_based_cf -> 05_user_based_cf -> 06_matrix_factorization ->
-# 07_ncf_training -> 08_model_comparison
+uv run python scripts/gen_synthetic_data.py  # dataset sintético em data/raw/
 ```
 
-### 4. (Opcional) Inspecionar Experimentos no MLflow
+### Executar
 
 ```bash
-uv run mlflow ui --host 0.0.0.0 --port 5000
-# Acessar: http://localhost:5000
+uv run dvc repro                              # preprocess -> train -> evaluate
+uv run dvc status                             # deve estar "up to date"
 ```
 
-### 5. Iniciar a API
+### Remote (versionamento de dados)
+
+O DVC está configurado com um remote local (`/tmp/dvc-store`):
+
+```bash
+uv run dvc push                               # envia dados ao remote
+uv run dvc pull                               # baixa dados do remote
+```
+
+---
+
+## MLflow (tracking e Model Registry)
+
+Cada estágio do pipeline rastreia parâmetros, métricas e artefatos no MLflow.
+O experimento é namespaced como `recsys-instacart/*` (≥7 runs).
+
+```bash
+uv run mlflow ui --backend-store-uri mlruns   # UI em http://localhost:5000
+```
+
+O estágio `evaluate` registra o melhor modelo (`item_based_cf_recommender`)
+no Model Registry, promovido via stages `Staging -> Production` e alias
+`@production`.
+
+---
+
+## API REST (FastAPI)
+
+### Local
 
 ```bash
 uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
-
-# Swagger UI: http://localhost:8000/docs
-# Health check: http://localhost:8000/health/status
+# Swagger: http://localhost:8000/docs
+# Health:  http://localhost:8000/health/status
 ```
 
 Exemplo de requisição:
@@ -146,94 +107,146 @@ curl -X POST http://localhost:8000/recommendations/ \
   -d '{"user_id": 1, "top_k": 5}'
 ```
 
-A API carrega o modelo `item_based_cf` (Production no MLflow Model Registry) e cai automaticamente no fallback de popularidade para usuários sem histórico conhecido (cold-start). Configurações (caminhos de artefatos, `top_k` padrão, etc.) são externalizadas via `.env` — ver [.env.example](.env.example).
+A API carrega o modelo do disco (`MODEL_SOURCE=local`, default) ou do MLflow
+Model Registry (`MODEL_SOURCE=registry`), com fallback de popularidade para
+cold-start.
+
+### Docker
+
+```bash
+docker build -t recsys-api .
+docker run -p 8000:8000 recsys-api
+# ou orquestração completa (API + MLflow):
+docker compose up --build
+```
+
+O `Dockerfile` é multi-stage (builder + runtime), `python:3.12-slim`, usuário
+não-root, com healthcheck.
 
 ---
 
 ## Desenvolvimento
 
-### Linting e Formatação
+### Linting, Formatação e Testes
 
 ```bash
-uv run ruff check .
-uv run ruff check . --fix
-uv run ruff format .
-```
-
-### Testes
-
-```bash
-# Executar testes
-uv run pytest tests/ -v
-
-# Com cobertura
-uv run pytest tests/ --cov=src
+uv run ruff check .                # lint
+uv run ruff format .               # formatação
+uv run pytest -q                   # testes (33 testes)
+uv run pre-commit run --all-files  # todos os hooks
 ```
 
 ### Commits
 
-Utilizar padrão semântico (ver [docs/COMMIT-CONVENTIONS.md](docs/COMMIT-CONVENTIONS.md)):
+Padrão Conventional Commits (ver [`docs/COMMIT-CONVENTIONS.md`](docs/COMMIT-CONVENTIONS.md)):
+
 ```bash
 git commit -m "feat: implementar modelo neural"
-git commit -m "fix: corrigir normalização de features"
-git commit -m "refactor: extrair service de recomendação"
+git commit -m "fix: corrigir normalizacao de features"
 ```
 
 ---
 
-## Arquitetura e Design Patterns
+## Estrutura do Projeto
+
+```
+src/
+├── api/                # API REST (FastAPI)
+│   ├── main.py          # Aplicação (lifespan, exception handlers, rotas)
+│   ├── config.py        # Settings da API (Pydantic)
+│   ├── dependencies.py  # Injeção de dependências
+│   ├── routes/          # health, recommendations
+│   ├── schemas/         # request, response, errors
+│   ├── services/        # recommendation_service
+│   ├── middleware/      # error_handler
+│   └── utils/           # logger (structlog)
+├── config.py            # Settings globais (Pydantic + validação de ambiente)
+├── evaluation/          # Métricas e utilitários de ranking
+├── models/              # Recomendadores, Factory, Registry e inferência
+│   ├── inference.py      # RecommendationEngine (predição)
+│   ├── model_loader.py  # ModelFactory (Factory Pattern)
+│   ├── registry_recommender.py  # Carrega do MLflow Model Registry
+│   ├── item_based_cf.py # Modelo Production
+│   ├── popularity.py    # Fallback cold-start
+│   ├── ncf.py           # Rede neural (PyTorch)
+│   └── training/        # Rotinas de treino dos 5 modelos (portadas dos notebooks)
+├── pipeline/            # Pipeline DVC (preprocess -> train -> evaluate)
+│   ├── common.py        # Seed, config, dataset_hash, MLflow setup
+│   ├── preprocess.py    # Estágio 1: split StratifiedKFold, vocabulários, matriz esparsa
+│   ├── train.py         # Estágio 2: treino dos 5 modelos
+│   └── evaluate.py      # Estágio 3: comparação, MODEL_CARD, Model Registry
+├── preprocessing/       # Strategy Pattern (InteractionFilter, UserItemEncoder)
+└── serving/             # MLflow pyfunc wrapper para o Registry
+tests/                    # Testes unitários (pytest)
+notebooks/                # EDA → pré-processamento → modelos → comparação
+configs/                  # Hiperparâmetros (YAML)
+data/                     # raw/ (DVC) e processed/ (saída do pipeline)
+models/                   # Artefatos, métricas e MODEL_CARD.md
+scripts/                  # validate_env.py, gen_synthetic_data.py
+docs/                     # Documentação de convenções e requisitos
+dvc.yaml                  # Pipeline DVC (3 estágios)
+dvc.lock                  # Lock do pipeline
+Dockerfile                # Multi-stage (builder + runtime)
+docker-compose.yml        # Orquestração (API + MLflow)
+.github/workflows/ci.yml  # CI: ruff + format + lock + pytest
+```
+
+---
+
+## Stack Tecnológico
+
+| Componente | Tecnologia |
+|-----------|----------|
+| Linguagem | Python 3.12+ |
+| Modelagem | PyTorch + Scikit-Learn |
+| API | FastAPI + Uvicorn |
+| Pipeline | DVC (3 estágios, remote local) |
+| Rastreamento | MLflow Tracking + Model Registry (Staging → Production) |
+| Container | Docker multi-stage + docker-compose |
+| CI | GitHub Actions (ruff, format, lock, pytest) |
+| Gerenciador de Deps | uv + pyproject.toml |
+| Linting | Ruff |
+| Logging | Structlog |
+| Testes | pytest |
+
+---
+
+## Design Patterns
 
 ### Factory Pattern
-`ModelFactory` em [`src/models/model_loader.py`](src/models/model_loader.py) registra e instancia os recomendadores (`item_based_cf`, `popularity`) sem que o código cliente conheça a classe concreta — novos modelos são adicionados via `ModelFactory.register(...)`.
+`ModelFactory` em [`src/models/model_loader.py`](src/models/model_loader.py) registra
+e instancia os recomendadores (`item_based_cf`, `item_based_cf_registry`, `popularity`)
+sem que o código cliente conheça a classe concreta.
+
+### Strategy Pattern
+`src/preprocessing/` implementa `InteractionFilterStrategy` e
+`UserItemEncoderStrategy`, encapsulando algoritmos de pré-processamento
+intercambiáveis.
 
 ### Dependency Injection
-`src/api/dependencies.py` injeta o `RecommendationEngine`/`RecommendationService` nas rotas via `Depends`, com carregamento único (singleton) e erro `503` (`ModelNotLoadedError`) caso os artefatos do modelo não possam ser carregados.
+`src/api/dependencies.py` injeta o `RecommendationEngine` nas rotas via `Depends`,
+com carregamento único (singleton) e erro `503` caso os artefatos não possam
+ser carregados.
 
 ---
 
-## Métricas de Avaliação
+## Resultados
 
-- **Precision@K** - Proporção de itens relevantes no top-K
-- **Recall@K** - Cobertura de itens relevantes
-- **NDCG (Normalized Discounted Cumulative Gain)** - Qualidade do ranking
-- **MAP (Mean Average Precision)** - Média de precisão em rankings
+Avaliação no mesmo split de teste interno (15% dos usuários; catálogo restrito
+aos 3.000 produtos mais comprados). Resultados completos em
+[`models/MODEL_CARD.md`](models/MODEL_CARD.md).
 
----
-
-## Resultados dos Modelos
-
-Os 5 modelos foram treinados e avaliados no mesmo split de teste interno (15% dos usuários, catálogo restrito aos 3.000 produtos mais comprados — 73,1% do volume de compras). Resultados completos em [`models/MODEL_CARD.md`](models/MODEL_CARD.md) e [`models/evaluation/metrics_comparison.csv`](models/evaluation/metrics_comparison.csv), gerados pelo notebook [`08_model_comparison.ipynb`](notebooks/08_model_comparison.ipynb).
-
-| Modelo | Precision@10 | Recall@10 | NDCG@10 | MAP@10 | Hit Rate@10 | Coverage@10 | Latência (ms/usuário) |
-|---|---|---|---|---|---|---|---|
-| Popularidade (baseline) | 0,0747 | 0,0935 | 0,1097 | 0,0522 | 0,4729 | 0,33% | 0,0001 |
-| **Item-based CF** | 0,1292 | **0,2236** | **0,2172** | **0,1274** | 0,6722 | 80,73% | 0,0815 |
-| User-based CF (KNN) | 0,1270 | 0,2051 | 0,2117 | 0,1227 | 0,6657 | 72,97% | 0,5362 |
-| Matrix Factorization (SVD) | **0,1398** | 0,2017 | 0,2032 | 0,1137 | 0,6636 | 21,53% | 0,0344 |
-| NCF (rede neural, PyTorch) | 0,0750 | 0,0930 | 0,1093 | 0,0519 | 0,4726 | 1,43% | 4,9801 |
-
-### Por que o Item-based CF foi escolhido como melhor modelo
-
-O **Item-based CF** foi promovido a `Production` no MLflow Model Registry por obter o melhor `Recall@10` e `NDCG@10` entre os 5 modelos — as métricas mais relevantes para o problema (cobertura do que o usuário de fato recompra e qualidade do ranking), além de aliar o segundo melhor `Coverage@10` (80,73% do catálogo é recomendado em algum momento, evitando recomendar sempre os mesmos itens populares) com baixíssima latência de inferência (0,08 ms/usuário) e tamanho de modelo modesto (29 MB). É esse o modelo servido pela API (`src/api/`).
-
-A rede neural (**NCF**, modelo principal exigido em PyTorch pelo Tech Challenge) foi implementada com embeddings de usuário/item + MLP, random search de hiperparâmetros e early stopping, mas **não superou os baselines de Collaborative Filtering** neste dataset — ficou no mesmo nível do baseline ingênuo de popularidade. A causa raiz está documentada em [`docs/NOTEBOOKS.md`](docs/NOTEBOOKS.md) (seção 7.3): o Instacart tem um viés de recompra muito forte (os mesmos produtos voltam a ser comprados repetidamente), um padrão que a similaridade de co-ocorrência item-a-item captura diretamente, enquanto a rede neural precisa aprendê-lo a partir de amostragem negativa e poucos dados — exigindo mais dados, épocas ou capacidade do modelo para superar técnicas clássicas mais simples nesse cenário. Por isso, o `ncf_recommender` permanece registrado em `Staging`: implementado, comparado e documentado conforme exigido, mas não promovido por desempenho inferior aos baselines.
-
----
-
-## Contribuindo
-
-1. Criar branch: `git checkout -b feature/minha-feature`
-2. Cometer mudanças: `git commit -m "feat: descrição"`
-3. Push: `git push origin feature/minha-feature`
-4. Abrir Pull Request
+O **Item-based CF** liderou em `Recall@10` e `NDCG@10` com alta cobertura e
+baixa latência, sendo promovido a `Production`. A rede neural **NCF**
+(modelo principal em PyTorch) foi implementada com embeddings + MLP, random
+search e early stopping, mas não superou os baselines de CF neste dataset —
+análise da causa-raiz em [`docs/NOTEBOOKS.md`](docs/NOTEBOOKS.md) (seção 7.3).
 
 ---
 
 ## Autor
 
 Desenvolvido para FIAP - Tech Challenge 2
-
----
 
 ## Licença
 
