@@ -18,7 +18,12 @@ import structlog
 from sklearn.model_selection import StratifiedKFold
 
 from src.config import get_settings
-from src.pipeline.common import compute_dataset_hash, load_config, set_seed
+from src.pipeline.common import (
+    compute_dataset_hash,
+    load_config,
+    set_seed,
+    setup_mlflow,
+)
 
 logger = structlog.get_logger()
 
@@ -273,16 +278,33 @@ def _split_dict(item_map, idx_p, cov, baskets, tu, vu, wu, idx_u, umap, m):
     }
 
 
-def _write_meta(settings, pre, sd, out_dir) -> None:
-    """Computes the dataset hash and writes split_meta.json."""
+def _compute_meta(settings, pre, sd) -> dict:
+    """Computes the dataset hash and assembles split_meta."""
     raw_files = [settings.raw_data_dir / n for n in _RAW_FILES]
-    meta = _build_meta(
+    return _build_meta(
         pre, settings, sd["shape"], sd["coverage"], compute_dataset_hash(raw_files)
     )
+
+
+def _write_meta(meta, out_dir) -> None:
+    """Writes split_meta.json."""
     with open(out_dir / "split_meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
         f.write("\n")
     logger.info("preprocessing_done", n_items_catalog=meta["n_items_catalog"])
+
+
+def _log_run(meta, settings) -> None:
+    """Logs preprocessing params, metrics and split_meta to MLflow."""
+    import mlflow
+
+    with mlflow.start_run(run_name="preprocessing_v1"):
+        mlflow.log_param("top_n_products", meta["top_n_products"])
+        mlflow.log_param("random_seed", meta["random_seed"])
+        mlflow.log_param("dataset_hash", meta["dataset_hash"])
+        mlflow.log_metric("n_items_catalog", meta["n_items_catalog"])
+        mlflow.log_metric("coverage", meta["catalog_coverage"])
+        mlflow.log_artifact(str(settings.processed_data_dir / "split_meta.json"))
 
 
 def main() -> None:
@@ -291,6 +313,7 @@ def main() -> None:
     config = load_config()
     pre = config["preprocessing"]
     set_seed(settings.random_seed)
+    setup_mlflow("preprocessing")
     out_dir = settings.processed_data_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     orders, prior, train, products = load_raw(settings.raw_data_dir)
@@ -298,7 +321,9 @@ def main() -> None:
     vocab = _build_vocab(products, sd)
     splits = _build_splits(sd)
     _save_artifacts(out_dir, vocab, sd["matrix"], splits)
-    _write_meta(settings, pre, sd, out_dir)
+    meta = _compute_meta(settings, pre, sd)
+    _write_meta(meta, out_dir)
+    _log_run(meta, settings)
 
 
 def _build_splits(sd) -> dict:
