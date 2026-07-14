@@ -28,7 +28,7 @@ from src.evaluation.ranking import recommendations_from_score_matrix
 from src.models.ncf import NeuralCollaborativeFiltering, score_all_items
 from src.models.training.data import load_processed
 from src.models.training.user_cf import build_recommendations
-from src.pipeline.common import load_config, set_seed
+from src.pipeline.common import load_config, set_seed, setup_mlflow
 
 logger = structlog.get_logger()
 
@@ -177,6 +177,18 @@ def _write_model_card(
     out.write_text(card, encoding="utf-8")
 
 
+def _log_run(df, best, dataset_hash) -> None:
+    """Logs the comparison metrics and the promoted model to MLflow."""
+    import mlflow
+
+    setup_mlflow("model_comparison")
+    with mlflow.start_run(run_name="model_comparison_v1"):
+        mlflow.log_param("dataset_hash", dataset_hash)
+        mlflow.log_param("model_promoted_to_production", best)
+        for model, row in df.iterrows():
+            mlflow.log_metrics({f"{model}_{c}": float(v) for c, v in row.items()})
+
+
 def main() -> None:
     """Runs the comparative evaluation and writes artifacts."""
     settings = get_settings()
@@ -194,6 +206,7 @@ def main() -> None:
     _write_model_card(
         df, best, data.split_meta["dataset_hash"], models_dir / "MODEL_CARD.md"
     )
+    _log_run(df, best, data.split_meta["dataset_hash"])
     logger.info("evaluation_done", best_model=best)
 
 
