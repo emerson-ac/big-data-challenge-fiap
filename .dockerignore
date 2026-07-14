@@ -1,0 +1,17 @@
+# Lean build context — exclude raw data, caches, experiments and tooling.
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.dvc/cache
+.dvc/tmp
+mlruns
+data/raw
+notebooks
+resources
+*.md
+.env
