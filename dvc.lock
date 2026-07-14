@@ -14,8 +14,8 @@ stages:
       nfiles: 4
     - path: src/config.py
       hash: md5
-      md5: b04f32564e9ddba2233a912b090f90c8
-      size: 3756
+      md5: c70a7cb94c5736e8639951a313b9e594
+      size: 4104
     - path: src/pipeline/common.py
       hash: md5
       md5: 16d187a0dd6e4dd4fad0be8d21ffdb4c
@@ -161,14 +161,14 @@ stages:
       size: 5260
     - path: src/pipeline/evaluate.py
       hash: md5
-      md5: d3e0006f4b9d568d585fadd672066786
-      size: 8483
+      md5: 53dbe4447ced6294e56a35a250e33bff
+      size: 9924
     outs:
     - path: models/MODEL_CARD.md
       hash: md5
-      md5: db87f84041da45c0240ff419d9abe21d
-      size: 1640
+      md5: 95da7cc87b9bba347eda1513c1dc0230
+      size: 1722
     - path: models/evaluation/metrics_comparison.csv
       hash: md5
-      md5: 20b1218437cc6311e69a4ac25e02e423
+      md5: 83b7738fb12a5c671021999f22cc4a84
       size: 447

@@ -1,8 +1,48 @@
-# Local orchestration: API + MLflow tracking server.
-# Start with: docker compose up --build
+# Local orchestration: MLflow server + API with registry serving.
+# Start with: docker-compose up --build
 # API: http://localhost:8000/docs   MLflow UI: http://localhost:5000
+#
+# Flow: mlflow server starts -> register service logs the best model as a
+# pyfunc in the registry (Staging -> Production) -> API loads the Production
+# model from the registry via http://mlflow:5000.
+#
+# The mlflow service runs as root to write to the shared volume; register
+# and api communicate with mlflow via HTTP only (no volume needed).
 
 services:
+  mlflow:
+    build:
+      context: .
+      target: runtime
+    user: root
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/tmp/mlruns
+    command: >
+      mlflow server
+      --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////tmp/mlflow.db
+      --serve-artifacts --artifacts-destination /tmp/mlruns
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  register:
+    build:
+      context: .
+      target: runtime
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    command: python scripts/register_model.py
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
@@ -10,25 +50,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MLFLOW_TRACKING_URI: mlruns
-    volumes:
-      - ./mlruns:/app/mlruns
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_SOURCE: registry
+    depends_on:
+      register:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/status')"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
-    depends_on:
-      mlflow:
-        condition: service_started
+      start_period: 15s
 
-  mlflow:
-    build:
-      context: .
-      target: runtime
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./mlruns:/app/mlruns
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri /app/mlruns
+volumes:
+  mlflow_data:
