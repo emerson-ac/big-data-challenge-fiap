@@ -1,0 +1,46 @@
+name: provision-cluster
+
+# Sobe o ambiente do ZERO: cria o cluster EKS + bucket S3 (bootstrap) e
+# em seguida instala plataforma + API (deploy). Só manual — criar cluster
+# leva ~15-20 min.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: cluster-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AWS_REGION: us-east-1
+      CLUSTER: recsys-challenge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install eksctl
+        run: |
+          curl -sSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" \
+            | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin/
+          eksctl version
+
+      - uses: azure/setup-helm@v4
+
+      - name: Bootstrap (cria cluster EKS + bucket S3)
+        run: bash scripts/bootstrap.sh
+
+      - name: Deploy (platform + API)
+        run: bash scripts/deploy.sh
