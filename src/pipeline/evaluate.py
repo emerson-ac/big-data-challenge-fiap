@@ -161,7 +161,11 @@ def _collect_rows(models_dir, interactions, gt, k) -> dict:
 
 
 def _write_model_card(
-    df: pd.DataFrame, best: str, dataset_hash: str, out: Path
+    df: pd.DataFrame,
+    best: str,
+    dataset_hash: str,
+    out: Path,
+    registered_name: str,
 ) -> None:
     """Generates MODEL_CARD.md from the comparison table."""
     beats_recall = bool(
@@ -174,6 +178,7 @@ def _write_model_card(
         beats_recall=beats_recall,
         beats_ndcg=beats_ndcg,
         best=best,
+        registered_name=registered_name,
     )
     out.write_text(card, encoding="utf-8")
 
@@ -225,6 +230,20 @@ def _promote(name: str, version: str, alias: str) -> None:
     )
 
 
+def _save_artifacts(df, best, data, models_dir, registered_name) -> None:
+    """Writes the comparison CSV and the dynamic MODEL_CARD."""
+    eval_dir = models_dir / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
+    _write_model_card(
+        df,
+        best,
+        data.split_meta["dataset_hash"],
+        models_dir / "MODEL_CARD.md",
+        registered_name,
+    )
+
+
 def main() -> None:
     """Runs the comparative evaluation and writes artifacts."""
     settings = get_settings()
@@ -236,12 +255,7 @@ def main() -> None:
     rows = _collect_rows(models_dir, data.interactions, data.test_ground_truth, k)
     df = pd.DataFrame(rows).T.rename_axis("model")
     best = str(df["recall_at_k"].idxmax())
-    eval_dir = models_dir / "evaluation"
-    eval_dir.mkdir(parents=True, exist_ok=True)
-    df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
-    _write_model_card(
-        df, best, data.split_meta["dataset_hash"], models_dir / "MODEL_CARD.md"
-    )
+    _save_artifacts(df, best, data, models_dir, settings.registered_model_name)
     _register(df, best, data.split_meta["dataset_hash"], settings)
     logger.info("evaluation_done", best_model=best)
 
@@ -259,8 +273,8 @@ Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash
 - NCF supera todos os baselines em recall@k: {beats_recall}
 - NCF supera todos os baselines em ndcg@k: {beats_ndcg}
 - Modelo com melhor recall@k: **{best}**
-- `item_based_cf_recommender` promovido via stages Staging -> Production e
-  alias **@production** no MLflow Model Registry; os demais nao sao registrados.
+- `{registered_name}` (pyfunc servindo **{best}**) promovido via stages
+  Staging -> Production e alias **@production** no MLflow Model Registry.
 
 Gerado automaticamente por `src/pipeline/evaluate.py`.
 """
