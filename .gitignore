@@ -100,3 +100,4 @@ desktop.ini
 
 # Materiais de estudo (PDFs de curso, nao versionados)
 resources/
+mlflow.db

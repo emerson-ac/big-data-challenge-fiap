@@ -11,8 +11,9 @@ WORKDIR /app
 ENV UV_PYTHON_DOWNLOADS=0 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
-# Slim deps set: skip training/viz-only packages (not imported at serve time).
-ARG SERVING_NO_INSTALL="--no-install-package torch --no-install-package matplotlib --no-install-package seaborn"
+# Slim deps set: skip viz-only packages (torch kept — NCF is the main model
+# and must be servable in production per edital §4).
+ARG SERVING_NO_INSTALL="--no-install-package matplotlib --no-install-package seaborn"
 # 1) Install dependencies only (cacheable layer, lock-pinned).
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project ${SERVING_NO_INSTALL}
@@ -26,6 +27,7 @@ WORKDIR /app
 COPY --from=builder --chown=appuser:appuser /app /app
 USER appuser
 ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH=/app \
     PYTHONUNBUFFERED=1
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
