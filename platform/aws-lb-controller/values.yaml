@@ -1,0 +1,8 @@
+# Values do chart eks/aws-load-balancer-controller.
+# A ServiceAccount já é criada pelo eksctl (com IRSA), por isso create: false.
+# clusterName e vpcId devem corresponder ao cluster criado por cluster/cluster.yaml.
+clusterName: recsys-challenge
+region: us-east-1
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller

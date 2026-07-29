@@ -1,0 +1,42 @@
+name: destroy
+
+# Derruba o cluster EKS para não gastar (remove Ingress -> ALB antes, depois
+# eksctl delete cluster). Bucket S3 e VPC pré-existente permanecem.
+# Só manual: um clique derruba.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write     # necessário para OIDC (assumir role na AWS)
+  contents: read
+
+# Evita destroy e provision/deploy rodando ao mesmo tempo.
+concurrency:
+  group: cluster-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_REGION: us-east-1
+      CLUSTER: recsys-challenge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}   # definido por scripts/setup-github-oidc.sh
+          aws-region: us-east-1
+
+      - name: Install eksctl
+        run: |
+          curl -sSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" \
+            | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin/
+          eksctl version
+
+      - name: Destroy (eksctl delete cluster)
+        run: bash scripts/destroy.sh

@@ -1,0 +1,18 @@
+# Service ClusterIP que expõe os pods da API (porta 80 -> containerPort 8000).
+# É o backend referenciado pelo Ingress ALB.
+apiVersion: v1
+kind: Service
+metadata:
+  name: recsys-api
+  namespace: models
+  labels:
+    app: recsys-api
+spec:
+  type: ClusterIP
+  selector:
+    app: recsys-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
