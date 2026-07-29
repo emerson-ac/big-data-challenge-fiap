@@ -1,6 +1,6 @@
 # Reproducible pipeline: preprocess -> train -> evaluate.
 # Run with: uv run dvc repro   (uses data/raw/ as input).
-# Outputs with `cache: false` stay versioned in git (not pushed to the DVC cache).
+# Outputs use DVC cache (cache: true, default) — not committed to git.
 stages:
   preprocess:
     cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.preprocess
@@ -11,18 +11,12 @@ stages:
       - src/config.py
       - configs/model_config.yaml
     outs:
-      - data/processed/interactions_prior.npz:
-          cache: false
-      - data/processed/vocabularies.pkl:
-          cache: false
-      - data/processed/train_pairs.pkl:
-          cache: false
-      - data/processed/val_pairs.pkl:
-          cache: false
-      - data/processed/test_pairs.pkl:
-          cache: false
-      - data/processed/split_meta.json:
-          cache: false
+      - data/processed/interactions_prior.npz
+      - data/processed/vocabularies.pkl
+      - data/processed/train_pairs.pkl
+      - data/processed/val_pairs.pkl
+      - data/processed/test_pairs.pkl
+      - data/processed/split_meta.json
 
   train:
     cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.train
@@ -34,31 +28,19 @@ stages:
       - src/evaluation
       - configs/model_config.yaml
     outs:
-      - models/baseline_popularity/ranking.pkl:
-          cache: false
-      - models/item_based_cf/item_similarity.npz:
-          cache: false
-      - models/user_based_cf/knn_model.pkl:
-          cache: false
-      - models/matrix_factorization/user_factors.npy:
-          cache: false
-      - models/matrix_factorization/item_factors.npy:
-          cache: false
-      - models/neural_network/model.pt:
-          cache: false
-      - models/neural_network/training_history.pkl:
-          cache: false
+      - models/baseline_popularity/ranking.pkl
+      - models/item_based_cf/item_similarity.npz
+      - models/user_based_cf/knn_model.pkl
+      - models/matrix_factorization/user_factors.npy
+      - models/matrix_factorization/item_factors.npy
+      - models/neural_network/model.pt
+      - models/neural_network/training_history.pkl
     metrics:
-      - models/baseline_popularity/metrics.json:
-          cache: false
-      - models/item_based_cf/metrics.json:
-          cache: false
-      - models/user_based_cf/metrics.json:
-          cache: false
-      - models/matrix_factorization/metrics.json:
-          cache: false
-      - models/neural_network/metrics.json:
-          cache: false
+      - models/baseline_popularity/metrics.json
+      - models/item_based_cf/metrics.json
+      - models/user_based_cf/metrics.json
+      - models/matrix_factorization/metrics.json
+      - models/neural_network/metrics.json
 
   evaluate:
     cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.evaluate
@@ -72,8 +54,6 @@ stages:
       - models/neural_network/model.pt
       - models/baseline_popularity/ranking.pkl
     outs:
-      - models/MODEL_CARD.md:
-          cache: false
+      - models/MODEL_CARD.md
     metrics:
-      - models/evaluation/metrics_comparison.csv:
-          cache: false
+      - models/evaluation/metrics_comparison.csv
