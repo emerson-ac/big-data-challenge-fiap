@@ -51,12 +51,11 @@ htmlcov/
 # Dataset e Dados
 data/raw/*.csv
 !data/raw/.gitkeep
-# data/processed e gerado pelo pipeline DVC (dvc.yaml, cache: false) e
-# versionado no git junto do dvc.lock.
 
-# Modelos Treinados
-# Artefatos binarios sao gerados pelo pipeline DVC (dvc.yaml, cache: false)
-# e versionados no git junto do dvc.lock.
+# Pipeline outputs (DVC cache: true) — managed by DVC, not git.
+# dvc pull to fetch, dvc repro to regenerate.
+/data/processed/
+/models/
 
 # MLflow
 mlruns/
