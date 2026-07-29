@@ -13,6 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+print("Inicializando validação...", flush=True)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.config import check_environment, get_settings  # noqa: E402
@@ -23,11 +24,15 @@ FAILED = "[FAIL]"
 
 def main() -> int:
     """Prints the validation report and returns the process exit code."""
+    print("Carregando configurações...", flush=True)
     settings = get_settings()
-    print(f"MLflow tracking URI : {settings.mlflow_tracking_uri}")
-    print(f"MLflow experiment   : {settings.mlflow_experiment_name}")
-    print(f"Random seed         : {settings.random_seed}")
+    print(f"  MLflow tracking URI : {settings.mlflow_tracking_uri}")
+    print(f"  MLflow experiment   : {settings.mlflow_experiment_name}")
+    print(f"  Random seed         : {settings.random_seed}")
     print()
+    print(
+        "Verificando Python, pacotes e seed (pode levar alguns segundos)...", flush=True
+    )
     results = check_environment()
     _print_report(results)
     return 0 if all(passed for _, passed, _ in results) else 1

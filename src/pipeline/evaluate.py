@@ -209,6 +209,7 @@ def _register(df, best, dataset_hash, settings) -> None:
                 best, settings.models_dir, settings.processed_data_dir
             ),
             registered_model_name=name,
+            input_example=pd.DataFrame({"user_idx": [1], "k": [10]}),
         )
     _promote(name, info.registered_model_version, settings.model_alias)
 
