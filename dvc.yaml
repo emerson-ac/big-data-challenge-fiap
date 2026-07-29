@@ -3,7 +3,7 @@
 # Outputs with `cache: false` stay versioned in git (not pushed to the DVC cache).
 stages:
   preprocess:
-    cmd: python -m src.pipeline.preprocess
+    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.preprocess
     deps:
       - data/raw
       - src/pipeline/preprocess.py
@@ -25,7 +25,7 @@ stages:
           cache: false
 
   train:
-    cmd: python -m src.pipeline.train
+    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.train
     deps:
       - data/processed
       - src/pipeline/train.py
@@ -61,7 +61,7 @@ stages:
           cache: false
 
   evaluate:
-    cmd: python -m src.pipeline.evaluate
+    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.evaluate
     deps:
       - src/pipeline/evaluate.py
       - src/models/training/user_cf.py

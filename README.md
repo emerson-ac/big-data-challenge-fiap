@@ -47,14 +47,18 @@ O pipeline tem 3 estágios: `preprocess -> train -> evaluate`, declarados em
 
 ### Dados
 
-Para reproduzir o pipeline do zero, coloque os CSVs do Instacart em `data/raw/`
-(download no [Kaggle](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset)).
-
-Alternativamente, gere um dataset sintético para validar o pipeline em segundos:
+O dataset real do Instacart (680MB) já está em `data/raw/` localmente. Como
+excede o limite prático do git, não é commitado (ver `.gitignore`). Para uma
+nova clonagem, baixe no
+[Kaggle](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset)
+ou use o dataset sintético:
 
 ```bash
-uv run python scripts/gen_synthetic_data.py  # dataset sintético em data/raw/
+uv run python scripts/gen_synthetic_data.py  # dataset sintético em data/raw/ (segundos)
 ```
+
+> **Atenção:** com o dataset real, os artefatos gerados (~107MB) não devem ser
+> commitados ao git (`cache: false`). Use `dvc push` para versioná-los no remote.
 
 ### Executar
 
@@ -63,9 +67,11 @@ uv run dvc repro                              # preprocess -> train -> evaluate
 uv run dvc status                             # deve estar "up to date"
 ```
 
-### Remote (versionamento de dados)
+### Remote DVC (versionamento de dados)
 
-O DVC está configurado com um remote local (`/tmp/dvc-store`):
+O DVC usa um remote local (`/tmp/dvc-store`) — o jeito mais simples de
+demonstrar `dvc push`/`dvc pull` sem credenciais cloud (Aula 3 — Armazenamento
+Remoto). Para S3, rode `scripts/setup_dvc_s3.sh` (PR #15).
 
 ```bash
 uv run dvc push                               # envia dados ao remote
@@ -112,6 +118,9 @@ Model Registry (`MODEL_SOURCE=registry`), com fallback de popularidade para
 cold-start.
 
 ### Docker
+
+> **Pré-requisito:** inicie o Docker (ou Colima no macOS: `colima start`)
+> antes de construir a imagem.
 
 ```bash
 docker build -t recsys-api .
