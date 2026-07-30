@@ -106,9 +106,13 @@ O experimento é namespaced como `recsys-instacart/*` (≥7 runs).
 uv run mlflow ui --backend-store-uri mlruns   # UI em http://localhost:5000
 ```
 
-O estágio `evaluate` registra o melhor modelo (`item_based_cf_recommender`)
-no Model Registry, promovido via stages `Staging -> Production` e alias
-`@production`.
+O estágio `evaluate` registra o melhor modelo por `Recall@K` no Model Registry
+sob o nome `recsys_recommender`, promovido via stages `Staging -> Production` e
+alias `@production`. O nome é neutro de propósito: qual dos 5 modelos é servido
+depende do resultado da avaliação, não de uma escolha fixa.
+
+O tipo promovido é gravado em `models/evaluation/promoted_model.json`, que a API
+lê para servir exatamente o mesmo modelo.
 
 ---
 
@@ -132,7 +136,9 @@ curl -X POST http://localhost:8000/recommendations/ \
 
 A API carrega o modelo do disco (`MODEL_SOURCE=local`, default) ou do MLflow
 Model Registry (`MODEL_SOURCE=registry`), com fallback de popularidade para
-cold-start.
+cold-start. Em ambos os casos serve o modelo **promovido** pela avaliação — o
+campo `model_type` da resposta informa qual foi usado. Para forçar um tipo
+específico, defina `RECOMMENDER_TYPE`.
 
 ### Docker
 
@@ -241,7 +247,7 @@ docker-compose.yml        # Orquestração (API + MLflow)
 
 ### Factory Pattern
 `ModelFactory` em [`src/models/model_loader.py`](src/models/model_loader.py) registra
-e instancia os recomendadores (`item_based_cf`, `item_based_cf_registry`, `popularity`)
+e instancia os recomendadores (`item_based_cf`, `registry`, `popularity`)
 sem que o código cliente conheça a classe concreta.
 
 ### Strategy Pattern

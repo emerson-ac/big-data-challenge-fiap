@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     config_path: Path = Path("configs/model_config.yaml")
     mlflow_tracking_uri: str = "mlruns"
     mlflow_experiment_name: str = "tech-challenge-recsys"
-    registered_model_name: str = "item_based_cf_recommender"
+    registered_model_name: str = "recsys_recommender"
     model_alias: str = "production"
     model_source: str = "local"
 

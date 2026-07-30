@@ -78,8 +78,13 @@ def model_artifacts(
 
 @pytest.fixture
 def engine(model_artifacts: dict) -> RecommendationEngine:
-    """RecommendationEngine real, carregado a partir dos artefatos sintéticos."""
+    """RecommendationEngine real, carregado a partir dos artefatos sintéticos.
+
+    O ``model_type`` é fixado para o teste não depender de qual modelo o
+    pipeline promoveu no ambiente onde a suíte roda.
+    """
     return RecommendationEngine(
+        model_type="item_based_cf",
         similarity_path=model_artifacts["similarity_path"],
         interactions_path=model_artifacts["interactions_path"],
         popularity_path=model_artifacts["popularity_path"],

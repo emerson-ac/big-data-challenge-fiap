@@ -43,5 +43,7 @@ class ModelFactory:
 
 
 ModelFactory.register("item_based_cf", ItemBasedCFRecommender.load)
-ModelFactory.register("item_based_cf_registry", RegistryRecommender.load)
+# "registry" resolves whichever model type is behind the @production alias, so
+# it is not tied to a specific algorithm.
+ModelFactory.register("registry", RegistryRecommender.load)
 ModelFactory.register("popularity", PopularityRecommender.load)

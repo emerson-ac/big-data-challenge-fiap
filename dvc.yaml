@@ -46,14 +46,24 @@ stages:
     cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.evaluate
     deps:
       - src/pipeline/evaluate.py
+      - src/pipeline/common.py
+      - src/serving/pyfunc.py
+      - src/evaluation
+      - src/models/training/data.py
       - src/models/training/user_cf.py
       - src/models/ncf.py
+      - src/config.py
+      - configs/model_config.yaml
+      - data/processed
       - models/item_based_cf/item_similarity.npz
       - models/matrix_factorization/user_factors.npy
+      - models/matrix_factorization/item_factors.npy
       - models/user_based_cf/knn_model.pkl
       - models/neural_network/model.pt
+      - models/neural_network/metrics.json
       - models/baseline_popularity/ranking.pkl
     outs:
       - models/MODEL_CARD.md
+      - models/evaluation/promoted_model.json
     metrics:
       - models/evaluation/metrics_comparison.csv

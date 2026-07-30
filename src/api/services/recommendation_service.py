@@ -18,6 +18,11 @@ class RecommendationService:
     def __init__(self, engine: RecommendationEngine) -> None:
         self._engine = engine
 
+    @property
+    def model_type(self) -> str:
+        """Modelo efetivamente carregado pelo motor (o promovido, por padrão)."""
+        return self._engine.model_type
+
     def get_recommendations(
         self, request: RecommendationRequest
     ) -> tuple[list[RecommendationItem], bool]:

@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 
-from src.api.config import settings
 from src.api.dependencies import get_recommendation_service
 from src.api.schemas.request import RecommendationRequest
 from src.api.schemas.response import RecommendationResponse
@@ -49,7 +48,7 @@ async def get_recommendations(
         user_id=request.user_id,
         is_cold_start=is_cold_start,
         recommendations=items,
-        model_type="popularity" if is_cold_start else settings.recommender_type,
+        model_type="popularity" if is_cold_start else service.model_type,
         timestamp=datetime.now(UTC),
         processing_time_ms=round(processing_time_ms, 2),
     )

@@ -14,7 +14,8 @@ class APISettings(BaseSettings):
         debug: Habilita modo debug/reload do uvicorn.
         host: Endereço de bind do servidor.
         port: Porta de bind do servidor.
-        recommender_type: Modelo registrado na ModelFactory usado em produção.
+        recommender_type: Override do modelo servido. Vazio (padrão) serve o
+            modelo promovido pelo estágio de avaliação.
         similarity_path: Caminho do artefato de similaridade item-item.
         interactions_path: Caminho do histórico de compras (sparse).
         popularity_path: Caminho do ranking de popularidade (fallback cold-start).
@@ -31,7 +32,7 @@ class APISettings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    recommender_type: str = "item_based_cf"
+    recommender_type: str | None = None
     similarity_path: Path = Path("models/item_based_cf/item_similarity.npz")
     interactions_path: Path = Path("data/processed/interactions_prior.npz")
     popularity_path: Path = Path("models/baseline_popularity/ranking.pkl")

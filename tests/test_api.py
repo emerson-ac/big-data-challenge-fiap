@@ -38,6 +38,15 @@ def test_recommendations_for_known_user(client: TestClient) -> None:
     assert [item["product_id"] for item in body["recommendations"]] == [100, 200]
 
 
+def test_response_reports_the_model_actually_loaded(
+    client: TestClient, engine: RecommendationEngine
+) -> None:
+    """model_type vem do motor carregado, não de um valor de configuração."""
+    response = client.post("/recommendations/", json={"user_id": 10, "top_k": 1})
+
+    assert response.json()["model_type"] == engine.model_type
+
+
 def test_recommendations_for_unknown_user_is_cold_start(client: TestClient) -> None:
     """Usuário desconhecido em POST /recommendations/ usa o fallback de popularidade."""
     response = client.post("/recommendations/", json={"user_id": 999, "top_k": 2})
