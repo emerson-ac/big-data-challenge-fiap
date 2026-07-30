@@ -1,7 +1,9 @@
 name: Deploy API
 
 # Build da imagem da API (FastAPI) no Docker Hub e deploy no EKS (kubectl).
-# Reaproveita a Deployment declarativa em k8s/api e o cluster recsys-challenge.
+# Reaproveita a Deployment declarativa em k8s/api e o cluster arcobridgegitops
+# (pre-existente, compartilhado). A role assumida via OIDC tem acesso apenas ao
+# namespace `models` — este workflow nao instala nada em kube-system.
 on:
   push:
     branches: [main]
@@ -25,7 +27,7 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
-  CLUSTER: recsys-challenge
+  CLUSTER: arcobridgegitops
   NAMESPACE: models
   DEPLOYMENT: recsys-api
 

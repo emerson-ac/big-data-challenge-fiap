@@ -4,10 +4,10 @@
 # de um bucket S3 (aws s3 sync) para volumes emptyDir, montados sobre
 # /app/models e /app/data — os caminhos que src/models/inference.py usa.
 #
-# Requer:
-#   - namespace `models` e SA `sa-model-s3` (IRSA, S3 read-only) — criados pelo
-#     eksctl a partir de cluster/cluster.yaml;
-#   - AWS Load Balancer Controller — instalado por scripts/deploy.sh.
+# Requer (todos pré-existentes no cluster arcobridgegitops):
+#   - namespace `models` e SA `sa-model-s3` (IRSA, S3 read-only);
+#   - AWS Load Balancer Controller em kube-system (compartilhado — não
+#     reinstalar: atende os Ingress de todos os namespaces).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,7 +33,8 @@ spec:
             - name: AWS_REGION
               value: us-east-1
             - name: MODELS_BUCKET
-              # Ajuste para o seu bucket (ex: recsys-challenge-models-<account-id>).
+              # Bucket de modelos do projeto: arcobridgegitops-models-<account-id>.
+              # Publique os artefatos antes com scripts/publish_api_artifacts.sh.
               value: REPLACE_WITH_YOUR_BUCKET
             - name: S3_PREFIX
               value: recsys-api

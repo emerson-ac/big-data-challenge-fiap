@@ -1,4 +1,5 @@
 [core]
-    remote = localstore
-['remote "localstore"']
-    url = /tmp/dvc-store
+    remote = s3remote
+['remote "s3remote"']
+    url = s3://arcobridgegitops-models-177300752486/dvc
+    region = us-east-1

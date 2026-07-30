@@ -47,18 +47,28 @@ O pipeline tem 3 estágios: `preprocess -> train -> evaluate`, declarados em
 
 ### Dados
 
-O dataset real do Instacart (680MB) já está em `data/raw/` localmente. Como
-excede o limite prático do git, não é commitado (ver `.gitignore`). Para uma
-nova clonagem, baixe no
+O dataset real do Instacart (680MB) é versionado pelo DVC (`data/raw.dvc`) e
+mora no remote S3, não no git. Numa nova clonagem:
+
+```bash
+uv run dvc pull                              # baixa data/raw/ do S3 (~680MB)
+```
+
+Sem acesso ao bucket, baixe do
 [Kaggle](https://www.kaggle.com/datasets/yasserh/instacart-online-grocery-basket-analysis-dataset)
-ou use o dataset sintético:
+ou gere o dataset sintético:
 
 ```bash
 uv run python scripts/gen_synthetic_data.py  # dataset sintético em data/raw/ (segundos)
 ```
 
-> **Atenção:** com o dataset real, os artefatos gerados (~107MB) não devem ser
-> commitados ao git (`cache: false`). Use `dvc push` para versioná-los no remote.
+O gerador remove o `data/raw.dvc` ao sobrescrever `data/raw/`, para que um
+`dvc repro` não registre os dados sintéticos como o dataset do projeto. Ele
+imprime como reverter.
+
+> **Atenção:** os artefatos do pipeline (`data/processed/`, `models/`) também são
+> gerenciados pelo DVC (cache padrão) e ignorados pelo git — use `dvc pull` para
+> obtê-los e `dvc push` após um `dvc repro`.
 
 ### Executar
 
@@ -69,14 +79,21 @@ uv run dvc status                             # deve estar "up to date"
 
 ### Remote DVC (versionamento de dados)
 
-O DVC usa um remote local (`/tmp/dvc-store`) — o jeito mais simples de
-demonstrar `dvc push`/`dvc pull` sem credenciais cloud (Aula 3 — Armazenamento
-Remoto). Para S3, rode `scripts/setup_dvc_s3.sh` (PR #15).
+O remote default é o S3 (Aula 3 — Armazenamento Remoto), declarado em
+[`.dvc/config`](.dvc/config):
+
+```
+s3://arcobridgegitops-models-177300752486/dvc   (us-east-1)
+```
 
 ```bash
-uv run dvc push                               # envia dados ao remote
-uv run dvc pull                               # baixa dados do remote
+uv run dvc push                               # envia dados/artefatos ao S3
+uv run dvc pull                               # baixa dados/artefatos do S3
+uv run dvc status -c                          # compara workspace x remote
 ```
+
+Requer credenciais AWS com acesso ao bucket (`aws configure` ou SSO). Para
+recriar a configuração do zero: `bash scripts/setup_dvc_s3.sh`.
 
 ---
 

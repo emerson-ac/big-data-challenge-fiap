@@ -76,6 +76,29 @@ def generate(out: Path, n_users: int, n_products: int) -> None:
             orders += e_orders
             train_rows += e_train
     _write_csvs(out, orders, prior_rows, train_rows, n_users, n_products, order_id)
+    _drop_dvc_pointer(out)
+
+
+def _drop_dvc_pointer(out: Path) -> None:
+    """Remove o ponteiro DVC do diretório sobrescrito, se houver.
+
+    O conteúdo sintético não deve ser registrado como o dataset do projeto:
+    ``data/raw`` é rastreado pelo DVC e um ``dvc repro`` re-hashearia o
+    diretório, reescrevendo o ponteiro com dados falsos (173 KB / 4 arquivos
+    em vez dos 713 MB / 6 arquivos do Instacart real).
+
+    Args:
+        out: Diretório onde o dataset sintético foi escrito.
+    """
+    pointer = out.parent / f"{out.name}.dvc"
+    if not pointer.exists():
+        return
+    pointer.unlink()
+    print(
+        f"[!] {pointer} removido: {out} agora contem dados sinteticos.\n"
+        f"    Para voltar ao dataset real: "
+        f"git checkout -- {pointer} && uv run dvc pull"
+    )
 
 
 def _write_csvs(
