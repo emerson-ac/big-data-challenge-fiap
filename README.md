@@ -106,9 +106,10 @@ O experimento é namespaced como `recsys-instacart/*` (≥7 runs).
 uv run mlflow ui --backend-store-uri mlruns   # UI em http://localhost:5000
 ```
 
-O estágio `evaluate` registra o melhor modelo (`item_based_cf_recommender`)
-no Model Registry, promovido via stages `Staging -> Production` e alias
-`@production`.
+O estágio `evaluate` registra o melhor modelo (vencedor por `Recall@10`) sob o
+nome model-agnostic `recsys_recommender` no Model Registry, promovido via stages
+`Staging -> Production` e alias `@production`. O pyfunc pode servir qualquer um
+dos 5 modelos — o nome do registro não presume o algoritmo vencedor.
 
 ---
 
