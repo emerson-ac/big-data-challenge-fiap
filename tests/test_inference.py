@@ -57,3 +57,26 @@ def test_recommend_respects_k(model_artifacts: dict) -> None:
     recommendations = engine.recommend(user_id=10, k=1)
 
     assert len(recommendations) == 1
+
+
+def test_model_type_reports_local_default(model_artifacts: dict) -> None:
+    """In local mode the engine reports the model it actually loaded."""
+    engine = _build_engine(model_artifacts)
+
+    assert engine.model_type == "item_based_cf"
+
+
+def test_popularity_can_serve_as_primary_model(model_artifacts: dict) -> None:
+    """A promoted popularity model is served (score_user), reported as such."""
+    engine = RecommendationEngine(
+        model_type="popularity",
+        similarity_path=model_artifacts["similarity_path"],
+        interactions_path=model_artifacts["interactions_path"],
+        popularity_path=model_artifacts["popularity_path"],
+        vocab_path=model_artifacts["vocab_path"],
+    )
+
+    recommendations = engine.recommend(user_id=10, k=2)
+
+    assert engine.model_type == "popularity"
+    assert [rec.product_id for rec in recommendations] == [400, 300]

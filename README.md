@@ -106,9 +106,10 @@ O experimento é namespaced como `recsys-instacart/*` (≥7 runs).
 uv run mlflow ui --backend-store-uri mlruns   # UI em http://localhost:5000
 ```
 
-O estágio `evaluate` registra o melhor modelo (`item_based_cf_recommender`)
-no Model Registry, promovido via stages `Staging -> Production` e alias
-`@production`.
+O estágio `evaluate` registra o melhor modelo (vencedor por `Recall@10`) sob o
+nome model-agnostic `recsys_recommender` no Model Registry, promovido via stages
+`Staging -> Production` e alias `@production`. O pyfunc pode servir qualquer um
+dos 5 modelos — o nome do registro não presume o algoritmo vencedor.
 
 ---
 
@@ -142,9 +143,16 @@ cold-start.
 ```bash
 docker build -t recsys-api .
 docker run -p 8000:8000 recsys-api
-# ou orquestração completa (API + MLflow):
+# ou orquestração completa (MLflow + treino + API):
 docker compose up --build
 ```
+
+O `docker-compose.yml` sobe três serviços encadeados: **`mlflow`** (tracking
+server), **`train`** (serviço de treino — gera dados sintéticos e roda o
+pipeline `preprocess → train → evaluate`, registrando e promovendo o melhor
+modelo no Registry) e **`api`** (serve o modelo `@production` do Registry,
+lendo vocabulário e fallback dos volumes compartilhados). O `train` e a `api`
+compartilham os volumes `models_data`/`processed_data`.
 
 O `Dockerfile` é multi-stage (builder + runtime), `python:3.12-slim`, usuário
 não-root, com healthcheck.
@@ -158,7 +166,7 @@ não-root, com healthcheck.
 ```bash
 uv run ruff check .                # lint
 uv run ruff format .               # formatação
-uv run pytest -q                   # testes (33 testes)
+uv run pytest -q                   # testes (45 testes)
 uv run pre-commit run --all-files  # todos os hooks
 ```
 

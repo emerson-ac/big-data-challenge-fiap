@@ -24,6 +24,7 @@ from src.evaluation.metrics import (
     evaluate_recommendations,
     hit_rate_at_k,
 )
+from src.evaluation.promotion import select_promoted_model
 from src.evaluation.ranking import recommendations_from_score_matrix
 from src.models.ncf import NeuralCollaborativeFiltering, score_all_items
 from src.models.training.data import load_processed
@@ -121,11 +122,27 @@ def _model_row(recs, gt, n_items, k, model_dir, patterns, lat) -> dict:
     return _row(recs, gt, n_items, k, _dir_size_mb(model_dir, patterns), lat)
 
 
-def _prep(interactions, gt) -> tuple:
-    """Returns (n_items, users, sample) for the test-split evaluation."""
-    n_items = interactions.shape[1]
-    users = list(gt.keys())
-    return n_items, users, users[: min(3000, len(users))]
+def _sample_users(users: list[int], cap: int, seed: int) -> list[int]:
+    """Selects a reproducible, uniform evaluation population.
+
+    Returns all users when the test split fits under the cap; otherwise a
+    seeded random sample (no user_idx bias), shared by every model so the
+    comparison table stays apples-to-apples (same population, same coverage
+    denominator context).
+
+    Args:
+        users: All test-split user indices.
+        cap: Maximum evaluation population size.
+        seed: RNG seed for reproducibility.
+
+    Returns:
+        The evaluation user indices (sorted for determinism).
+    """
+    if len(users) <= cap:
+        return users
+    rng = np.random.default_rng(seed)
+    chosen = rng.choice(len(users), size=cap, replace=False)
+    return [users[i] for i in sorted(chosen)]
 
 
 def _add_row(rows, name, recs_fn, gt, ctx):
@@ -145,29 +162,38 @@ _MODEL_DIRS = {
 }
 
 
-def _collect_rows(models_dir, interactions, gt, k) -> dict:
-    """Rebuilds the 5 models and collects their comparison rows (test split)."""
-    n_items, users, sample = _prep(interactions, gt)
-    sgt = {u: gt[u] for u in sample}
+def _collect_rows(models_dir, interactions, users, full_gt, k) -> dict:
+    """Rebuilds the 5 models and scores them on a single shared population.
+
+    Every model is evaluated on the same ``users`` (and their ground truth),
+    so all metrics — including coverage — are directly comparable.
+    """
+    n_items = interactions.shape[1]
+    gt = {u: full_gt[u] for u in users}
     md, it = models_dir, interactions
     ctx = {"md": md, "n_items": n_items, "k": k}
     rows: dict[str, dict] = {}
     _add_row(rows, "popularity", lambda: _popularity_recs(md, users, k), gt, ctx)
     _add_row(rows, "item_based_cf", lambda: _item_cf_recs(md, it, users, k), gt, ctx)
-    _add_row(rows, "user_based_cf", lambda: _user_cf_recs(md, it, sample, k), sgt, ctx)
+    _add_row(rows, "user_based_cf", lambda: _user_cf_recs(md, it, users, k), gt, ctx)
     _add_row(rows, "matrix_factorization", lambda: _mf_recs(md, users, k), gt, ctx)
     _add_row(rows, "ncf", lambda: _ncf_recs(md, it, users, k), gt, ctx)
     return rows
 
 
+def _ncf_verdict(beats_recall: bool, beats_ndcg: bool) -> str:
+    """One-line verdict on how the NCF compared to the CF baselines."""
+    if beats_recall and beats_ndcg:
+        return "superou os baselines de CF em recall@k e ndcg@k"
+    if beats_recall or beats_ndcg:
+        return "superou parcialmente os baselines de CF (ver tabela)"
+    return "nao superou os baselines de CF neste dataset"
+
+
 def _write_model_card(
-    df: pd.DataFrame,
-    best: str,
-    dataset_hash: str,
-    out: Path,
-    registered_name: str,
+    df: pd.DataFrame, dataset_hash: str, out: Path, ctx: dict
 ) -> None:
-    """Generates MODEL_CARD.md from the comparison table."""
+    """Generates MODEL_CARD.md (performance, limitations and biases)."""
     beats_recall = bool(
         df.loc["ncf", "recall_at_k"] > df.drop("ncf")["recall_at_k"].max()
     )
@@ -177,8 +203,13 @@ def _write_model_card(
         table=df.round(4).to_markdown(),
         beats_recall=beats_recall,
         beats_ndcg=beats_ndcg,
-        best=best,
-        registered_name=registered_name,
+        ncf_verdict=_ncf_verdict(beats_recall, beats_ndcg),
+        best=ctx["best"],
+        best_cov=round(float(df.loc[ctx["best"], "coverage_at_k"]), 4),
+        registered_name=ctx["registered_name"],
+        n_eval=ctx["n_eval"],
+        k=ctx["k"],
+        top_n=ctx["top_n"],
     )
     out.write_text(card, encoding="utf-8")
 
@@ -231,17 +262,24 @@ def _promote(name: str, version: str, alias: str) -> None:
     )
 
 
-def _save_artifacts(df, best, data, models_dir, registered_name) -> None:
+def _card_context(settings, config, best: str, n_eval: int) -> dict:
+    """Assembles the dynamic values injected into the MODEL_CARD."""
+    return {
+        "registered_name": settings.registered_model_name,
+        "best": best,
+        "n_eval": n_eval,
+        "k": config["evaluation"]["k"],
+        "top_n": config["preprocessing"]["top_n_products"],
+    }
+
+
+def _save_artifacts(df, data, models_dir, ctx) -> None:
     """Writes the comparison CSV and the dynamic MODEL_CARD."""
     eval_dir = models_dir / "evaluation"
     eval_dir.mkdir(parents=True, exist_ok=True)
     df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
     _write_model_card(
-        df,
-        best,
-        data.split_meta["dataset_hash"],
-        models_dir / "MODEL_CARD.md",
-        registered_name,
+        df, data.split_meta["dataset_hash"], models_dir / "MODEL_CARD.md", ctx
     )
 
 
@@ -251,21 +289,30 @@ def main() -> None:
     config = load_config()
     set_seed(settings.random_seed)
     k = config["evaluation"]["k"]
+    cap = config["evaluation"]["sample_size"]
     models_dir = settings.models_dir
     data = load_processed(settings.processed_data_dir)
-    rows = _collect_rows(models_dir, data.interactions, data.test_ground_truth, k)
+    gt = data.test_ground_truth
+    eval_users = _sample_users(list(gt.keys()), cap, settings.random_seed)
+    n_eval = len(eval_users)
+    rows = _collect_rows(models_dir, data.interactions, eval_users, gt, k)
     df = pd.DataFrame(rows).T.rename_axis("model")
-    best = str(df["recall_at_k"].idxmax())
-    _save_artifacts(df, best, data, models_dir, settings.registered_model_name)
+    best = select_promoted_model(df)
+    _save_artifacts(df, data, models_dir, _card_context(settings, config, best, n_eval))
     _register(df, best, data.split_meta["dataset_hash"], settings)
-    logger.info("evaluation_done", best_model=best)
+    logger.info("evaluation_done", best_model=best, eval_users=n_eval)
 
 
 _MODEL_CARD_TEMPLATE = """# Model Card - Sistema de Recomendacao Instacart
 
-Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash}...`.
+Comparacao de 5 modelos (top-{k}) no split de teste interno. Dataset hash: `{hash}...`.
 
-## Metricas (split de teste)
+Todos os modelos foram avaliados sobre a **mesma** populacao: {n_eval} usuarios do
+split de teste (amostra uniforme com seed 42 quando o teste excede o teto
+`evaluation.sample_size`). Isso garante que as metricas e o `coverage_at_k` sejam
+diretamente comparaveis entre modelos.
+
+## Performance (split de teste)
 
 {table}
 
@@ -276,6 +323,33 @@ Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash
 - Modelo com melhor recall@k: **{best}**
 - `{registered_name}` (pyfunc servindo **{best}**) promovido via stages
   Staging -> Production e alias **@production** no MLflow Model Registry.
+
+## Limitacoes
+
+- **Avaliacao offline**: metricas medidas em split historico; sem teste online/A-B,
+  entao exposicao, novidade e satisfacao real nao sao capturadas.
+- **Feedback implicito**: o ground truth sao itens comprados no periodo de teste;
+  ausencia de compra nao significa irrelevancia, o que subestima itens nunca expostos.
+- **Cold-start**: usuarios ou itens sem historico caem no fallback de popularidade,
+  sem personalizacao.
+- **NCF** (modelo principal em PyTorch) {ncf_verdict}; o trade-off e documentado, mas
+  o melhor modelo por recall@k e promovido conforme o edital.
+- **Catalogo restrito** aos {top_n} produtos mais comprados: itens de cauda longa
+  ficam fora da avaliacao e do serving.
+- **Variancia amostral**: quando o teste excede o teto, as metricas vem de uma amostra
+  de {n_eval} usuarios e carregam incerteza estatistica.
+
+## Possiveis Vieses
+
+- **Vies de popularidade**: o promovido (**{best}**) tem coverage@{k} = {best_cov};
+  cobertura baixa concentra recomendacoes em itens ja populares (efeito "rico fica
+  mais rico" / filter bubble) e reduz diversidade e descoberta.
+- **Vies de recompra** do Instacart: usuarios reabastecem os mesmos produtos,
+  favorecendo modelos que exploram o historico (item-based CF) e penalizando novidade.
+- **Vies de selecao**: o recorte de catalogo top-{top_n} e o split por usuario favorecem
+  itens e usuarios mais ativos; quem tem pouco historico e sub-representado.
+- **Dados sinteticos**: quando usados no lugar do Kaggle real, nao reproduzem o vies de
+  recompra e os resultados nao transferem diretamente.
 
 Gerado automaticamente por `src/pipeline/evaluate.py`.
 """

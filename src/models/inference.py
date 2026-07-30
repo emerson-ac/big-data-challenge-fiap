@@ -49,32 +49,47 @@ def load_vocabularies(vocab_path: Path = DEFAULT_VOCAB_PATH) -> dict[str, Any]:
         return pickle.load(f)
 
 
-def _build_primary_model(
-    source: str, model_type: str, similarity_path: Path, interactions_path: Path
+def _build_registry_model() -> Any:
+    """Loads the promoted model from the MLflow Registry (``@production``)."""
+    settings = get_settings()
+    return ModelFactory.create(
+        "item_based_cf_registry",
+        name=settings.registered_model_name,
+        alias=settings.model_alias,
+    )
+
+
+def _build_local_model(
+    model_type: str,
+    similarity_path: Path,
+    interactions_path: Path,
+    popularity_path: Path,
 ) -> Any:
-    """Instantiates the primary model per the source (registry or local).
-
-    Args:
-        source: "registry" (MLflow) or "local" (disk artifacts).
-        model_type: Local model name registered in ModelFactory.
-        similarity_path: Path to item-item similarity (local mode).
-        interactions_path: Path to purchase history (local mode).
-
-    Returns:
-        Recommender with a ``score_user`` method.
-    """
-    if source == "registry":
-        settings = get_settings()
-        return ModelFactory.create(
-            "item_based_cf_registry",
-            name=settings.registered_model_name,
-            alias=settings.model_alias,
-        )
+    """Instantiates a local primary model with the artifacts it needs."""
+    if model_type == "popularity":
+        return ModelFactory.create("popularity", ranking_path=popularity_path)
     return ModelFactory.create(
         model_type,
         similarity_path=similarity_path,
         interactions_path=interactions_path,
     )
+
+
+def _served_model_type(source: str, model_type: str, model: Any) -> str:
+    """Resolves the model type actually served (single source of truth).
+
+    Args:
+        source: "registry" or "local".
+        model_type: Requested local model name.
+        model: The instantiated primary model.
+
+    Returns:
+        The real served model name (registry unwraps the promoted pyfunc).
+    """
+    if source != "registry":
+        return model_type
+    served = getattr(model, "model_type", None)
+    return served or get_settings().registered_model_name
 
 
 class RecommendationEngine:
@@ -98,12 +113,26 @@ class RecommendationEngine:
         model_source: str | None = None,
     ) -> None:
         source = model_source or get_settings().model_source
-        self._model = _build_primary_model(
-            source, model_type, similarity_path, interactions_path
+        self._model = (
+            _build_registry_model()
+            if source == "registry"
+            else _build_local_model(
+                model_type, similarity_path, interactions_path, popularity_path
+            )
         )
+        self._model_type = _served_model_type(source, model_type, self._model)
         self._fallback = ModelFactory.create("popularity", ranking_path=popularity_path)
         self._vocab = load_vocabularies(vocab_path)
-        logger.info("recommendation_engine_loaded", model_source=source)
+        logger.info(
+            "recommendation_engine_loaded",
+            model_source=source,
+            model_type=self._model_type,
+        )
+
+    @property
+    def model_type(self) -> str:
+        """Name of the model actually serving recommendations (source of truth)."""
+        return self._model_type
 
     def is_known_user(self, user_id: int) -> bool:
         """Verifica se o usuário tem histórico conhecido pelo modelo treinado.

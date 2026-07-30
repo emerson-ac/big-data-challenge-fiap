@@ -1,7 +1,7 @@
 schema: '2.0'
 stages:
   preprocess:
-    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.preprocess
+    cmd: python -u -m src.pipeline.preprocess
     deps:
     - path: configs/model_config.yaml
       hash: md5
@@ -50,7 +50,7 @@ stages:
       md5: b1bed7b6d47e99e2ac025bd8d3f9bf75
       size: 3021489
   train:
-    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.train
+    cmd: python -u -m src.pipeline.train
     deps:
     - path: configs/model_config.yaml
       hash: md5
@@ -129,7 +129,7 @@ stages:
       md5: 31420da8c67ce2f23b162c4af40f2078
       size: 1247
   evaluate:
-    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.evaluate
+    cmd: python -u -m src.pipeline.evaluate
     deps:
     - path: models/baseline_popularity/ranking.pkl
       hash: md5

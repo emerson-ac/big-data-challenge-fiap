@@ -36,6 +36,7 @@ def test_recommendations_for_known_user(client: TestClient) -> None:
     assert response.status_code == 200
     assert body["is_cold_start"] is False
     assert [item["product_id"] for item in body["recommendations"]] == [100, 200]
+    assert body["model_type"] == "item_based_cf"
 
 
 def test_recommendations_for_unknown_user_is_cold_start(client: TestClient) -> None:
