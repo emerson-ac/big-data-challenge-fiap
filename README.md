@@ -62,6 +62,10 @@ ou gere o dataset sintético:
 uv run python scripts/gen_synthetic_data.py  # dataset sintético em data/raw/ (segundos)
 ```
 
+O gerador remove o `data/raw.dvc` ao sobrescrever `data/raw/`, para que um
+`dvc repro` não registre os dados sintéticos como o dataset do projeto. Ele
+imprime como reverter.
+
 > **Atenção:** os artefatos do pipeline (`data/processed/`, `models/`) também são
 > gerenciados pelo DVC (cache padrão) e ignorados pelo git — use `dvc pull` para
 > obtê-los e `dvc push` após um `dvc repro`.
