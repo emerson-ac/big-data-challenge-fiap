@@ -273,12 +273,40 @@ def _promote(name: str, version: str, alias: str) -> None:
     )
 
 
-def _save_artifacts(df, best, data, models_dir, registered_name) -> None:
-    """Writes the comparison CSV and the dynamic MODEL_CARD."""
+def _write_promoted_marker(df, best: str, data, out: Path, settings) -> None:
+    """Records which model type was promoted, for the API to serve it.
+
+    Without this the API would have to hardcode a recommender, which drifts
+    from the model actually promoted to Production.
+
+    Args:
+        df: Comparison table indexed by model.
+        best: Name of the promoted model.
+        data: Processed artifacts (for the dataset hash).
+        out: Destination path of the marker JSON.
+        settings: Validated application settings.
+    """
+    payload = {
+        "model_type": best,
+        "registered_model_name": settings.registered_model_name,
+        "alias": settings.model_alias,
+        "dataset_hash": data.split_meta["dataset_hash"],
+        "recall_at_k": float(df.loc[best, "recall_at_k"]),
+    }
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+        f.write("\n")
+
+
+def _save_artifacts(df, best, data, models_dir, settings) -> None:
+    """Writes the comparison CSV, the MODEL_CARD and the promoted marker."""
     eval_dir = models_dir / "evaluation"
     eval_dir.mkdir(parents=True, exist_ok=True)
     df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
-    _write_model_card(df, best, data, models_dir / "MODEL_CARD.md", registered_name)
+    _write_model_card(
+        df, best, data, models_dir / "MODEL_CARD.md", settings.registered_model_name
+    )
+    _write_promoted_marker(df, best, data, eval_dir / "promoted_model.json", settings)
 
 
 def main() -> None:
@@ -292,7 +320,7 @@ def main() -> None:
     rows = _collect_rows(models_dir, data.interactions, data.test_ground_truth, k)
     df = pd.DataFrame(rows).T.rename_axis("model")
     best = str(df["recall_at_k"].idxmax())
-    _save_artifacts(df, best, data, models_dir, settings.registered_model_name)
+    _save_artifacts(df, best, data, models_dir, settings)
     _register(df, best, data.split_meta["dataset_hash"], settings)
     logger.info("evaluation_done", best_model=best)
 

@@ -64,5 +64,6 @@ stages:
       - models/baseline_popularity/ranking.pkl
     outs:
       - models/MODEL_CARD.md
+      - models/evaluation/promoted_model.json
     metrics:
       - models/evaluation/metrics_comparison.csv

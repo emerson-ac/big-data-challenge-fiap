@@ -179,6 +179,30 @@ _SCORER_CLASSES: dict[str, type] = {
 }
 
 
+def build_scorer(model_type: str, models_dir: Any, processed_dir: Any) -> Any:
+    """Builds the scorer of a model type directly from on-disk artifacts.
+
+    Lets the API serve whichever model the evaluation stage promoted, using the
+    same scoring code that is packaged into the Registry — instead of a
+    hardcoded recommender.
+
+    Args:
+        model_type: One of the 5 registered model types.
+        models_dir: Root models directory.
+        processed_dir: The ``data/processed`` directory.
+
+    Returns:
+        Callable scorer exposing ``__call__(user_idx) -> np.ndarray``.
+
+    Raises:
+        ValueError: If model_type is not one of the 5 known types.
+    """
+    cls = _SCORER_CLASSES.get(model_type)
+    if cls is None:
+        raise ValueError(f"Unknown model_type '{model_type}'")
+    return cls(build_artifacts(model_type, models_dir, processed_dir))
+
+
 class RecommenderPyfunc(mlflow.pyfunc.PythonModel):
     """Serves any of the 5 recommenders from packaged MLflow artifacts.
 

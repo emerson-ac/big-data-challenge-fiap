@@ -1,5 +1,6 @@
 """Recommendation prediction: entrypoint used by the service/API."""
 
+import json
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,7 @@ import structlog
 from src.config import get_settings
 from src.evaluation.ranking import top_k_from_scores
 from src.models.model_loader import ModelFactory
+from src.serving.pyfunc import build_scorer
 
 logger = structlog.get_logger()
 
@@ -19,6 +21,29 @@ DEFAULT_SIMILARITY_PATH = Path("models/item_based_cf/item_similarity.npz")
 DEFAULT_INTERACTIONS_PATH = Path("data/processed/interactions_prior.npz")
 DEFAULT_POPULARITY_PATH = Path("models/baseline_popularity/ranking.pkl")
 DEFAULT_VOCAB_PATH = Path("data/processed/vocabularies.pkl")
+PROMOTED_MARKER = Path("models/evaluation/promoted_model.json")
+
+# Types the local engine can build from the paths configured via .env; any other
+# promoted type is built from its packaged artifacts by src.serving.pyfunc.
+_PATH_BUILT_TYPES = ("item_based_cf",)
+
+
+def read_promoted_model_type(marker: Path = PROMOTED_MARKER) -> str:
+    """Reads the model type promoted by the evaluation stage.
+
+    Args:
+        marker: Path to ``promoted_model.json`` written by the evaluate stage.
+
+    Returns:
+        The promoted model type, or DEFAULT_MODEL_TYPE if the marker is absent
+        or unreadable (a fresh clone that never ran the pipeline).
+    """
+    try:
+        with open(marker, encoding="utf-8") as f:
+            return str(json.load(f)["model_type"])
+    except (OSError, KeyError, json.JSONDecodeError):
+        logger.info("promoted_marker_unavailable", fallback=DEFAULT_MODEL_TYPE)
+        return DEFAULT_MODEL_TYPE
 
 
 @dataclass(frozen=True)
@@ -49,16 +74,29 @@ def load_vocabularies(vocab_path: Path = DEFAULT_VOCAB_PATH) -> dict[str, Any]:
         return pickle.load(f)
 
 
-def _build_primary_model(
-    source: str, model_type: str, similarity_path: Path, interactions_path: Path
-) -> Any:
+class _ScorerAdapter:
+    """Adapts a ``src.serving.pyfunc`` scorer to the Recommender protocol.
+
+    Args:
+        scorer: Callable mapping user_idx to a dense score vector.
+    """
+
+    def __init__(self, scorer: Any) -> None:
+        self._scorer = scorer
+
+    def score_user(self, user_idx: int) -> np.ndarray:
+        """Computes the dense per-item score vector for a known user."""
+        return self._scorer(user_idx)
+
+
+def _build_primary_model(source: str, model_type: str, paths: dict[str, Path]) -> Any:
     """Instantiates the primary model per the source (registry or local).
 
     Args:
         source: "registry" (MLflow) or "local" (disk artifacts).
-        model_type: Local model name registered in ModelFactory.
-        similarity_path: Path to item-item similarity (local mode).
-        interactions_path: Path to purchase history (local mode).
+        model_type: Model type to serve (the promoted one, unless overridden).
+        paths: Artifact locations — ``similarity_path``, ``interactions_path``,
+            ``models_dir`` and ``processed_dir``.
 
     Returns:
         Recommender with a ``score_user`` method.
@@ -66,14 +104,18 @@ def _build_primary_model(
     if source == "registry":
         settings = get_settings()
         return ModelFactory.create(
-            "item_based_cf_registry",
+            "registry",
             name=settings.registered_model_name,
             alias=settings.model_alias,
         )
-    return ModelFactory.create(
-        model_type,
-        similarity_path=similarity_path,
-        interactions_path=interactions_path,
+    if model_type in _PATH_BUILT_TYPES:
+        return ModelFactory.create(
+            model_type,
+            similarity_path=paths["similarity_path"],
+            interactions_path=paths["interactions_path"],
+        )
+    return _ScorerAdapter(
+        build_scorer(model_type, paths["models_dir"], paths["processed_dir"])
     )
 
 
@@ -81,29 +123,56 @@ class RecommendationEngine:
     """Orchestrates the Production model and the popularity fallback.
 
     Args:
-        model_type: Name of the model registered in ModelFactory.
+        model_type: Model type to serve. ``None`` (default) serves whichever
+            model the evaluation stage promoted, read from ``promoted_marker``.
         similarity_path: Path to the item-item similarity artifact.
         interactions_path: Path to the purchase history (sparse).
         popularity_path: Path to the popularity ranking (cold-start fallback).
         vocab_path: Path to the user/product vocabularies.
+        model_source: "local" or "registry"; defaults to the setting.
+        promoted_marker: Path to the promoted-model marker JSON.
+        models_dir: Root models directory, used when the promoted model is not
+            built from the individual paths above.
+        processed_dir: The ``data/processed`` directory, same use as models_dir.
     """
 
     def __init__(
         self,
-        model_type: str = DEFAULT_MODEL_TYPE,
+        model_type: str | None = None,
         similarity_path: Path = DEFAULT_SIMILARITY_PATH,
         interactions_path: Path = DEFAULT_INTERACTIONS_PATH,
         popularity_path: Path = DEFAULT_POPULARITY_PATH,
         vocab_path: Path = DEFAULT_VOCAB_PATH,
         model_source: str | None = None,
+        promoted_marker: Path = PROMOTED_MARKER,
+        models_dir: Path | None = None,
+        processed_dir: Path | None = None,
     ) -> None:
-        source = model_source or get_settings().model_source
+        settings = get_settings()
+        source = model_source or settings.model_source
+        self._model_type = model_type or read_promoted_model_type(promoted_marker)
         self._model = _build_primary_model(
-            source, model_type, similarity_path, interactions_path
+            source,
+            self._model_type,
+            {
+                "similarity_path": similarity_path,
+                "interactions_path": interactions_path,
+                "models_dir": models_dir or settings.models_dir,
+                "processed_dir": processed_dir or settings.processed_data_dir,
+            },
         )
         self._fallback = ModelFactory.create("popularity", ranking_path=popularity_path)
         self._vocab = load_vocabularies(vocab_path)
-        logger.info("recommendation_engine_loaded", model_source=source)
+        logger.info(
+            "recommendation_engine_loaded",
+            model_source=source,
+            model_type=self._model_type,
+        )
+
+    @property
+    def model_type(self) -> str:
+        """Model type effectively being served (not the configured default)."""
+        return self._model_type
 
     def is_known_user(self, user_id: int) -> bool:
         """Verifica se o usuário tem histórico conhecido pelo modelo treinado.
