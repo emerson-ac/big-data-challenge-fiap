@@ -53,8 +53,11 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Baixar dados/artefatos do S3 (DVC)
-        run: uv run dvc pull -r s3remote
+      # Só o dataset de entrada: os artefatos do pipeline são regenerados pelo
+      # dvc repro abaixo. Um `dvc pull` completo sairia com codigo 1 enquanto
+      # houver output ainda nao publicado no remote.
+      - name: Baixar dataset do S3 (DVC)
+        run: uv run dvc pull data/raw.dvc -r s3remote
 
       - name: Reproduzir pipeline (preprocess -> train -> evaluate -> @production)
         run: uv run dvc repro
