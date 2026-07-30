@@ -53,9 +53,13 @@ data/raw/*.csv
 !data/raw/.gitkeep
 
 # Pipeline outputs (DVC cache: true) — managed by DVC, not git.
-# dvc pull to fetch, dvc repro to regenerate.
-/data/processed/
-/models/
+# dvc pull to fetch, dvc repro to regenerate. The .gitkeep markers keep the
+# required directories (src/, tests/, data/, models/, configs/) present on a
+# fresh clone even though their generated contents are not committed.
+/data/processed/*
+!/data/processed/.gitkeep
+/models/*
+!/models/.gitkeep
 
 # MLflow
 mlruns/

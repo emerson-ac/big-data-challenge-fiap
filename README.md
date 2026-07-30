@@ -143,9 +143,16 @@ cold-start.
 ```bash
 docker build -t recsys-api .
 docker run -p 8000:8000 recsys-api
-# ou orquestração completa (API + MLflow):
+# ou orquestração completa (MLflow + treino + API):
 docker compose up --build
 ```
+
+O `docker-compose.yml` sobe três serviços encadeados: **`mlflow`** (tracking
+server), **`train`** (serviço de treino — gera dados sintéticos e roda o
+pipeline `preprocess → train → evaluate`, registrando e promovendo o melhor
+modelo no Registry) e **`api`** (serve o modelo `@production` do Registry,
+lendo vocabulário e fallback dos volumes compartilhados). O `train` e a `api`
+compartilham os volumes `models_data`/`processed_data`.
 
 O `Dockerfile` é multi-stage (builder + runtime), `python:3.12-slim`, usuário
 não-root, com healthcheck.

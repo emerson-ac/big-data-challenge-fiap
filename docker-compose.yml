@@ -1,13 +1,13 @@
-# Local orchestration: MLflow server + API with registry serving.
-# Start with: docker-compose up --build
+# Local orchestration: MLflow server + training pipeline + API (registry serving).
+# Start with: docker compose up --build
 # API: http://localhost:8000/docs   MLflow UI: http://localhost:5000
 #
-# Flow: mlflow server starts -> register service logs the best model as a
-# pyfunc in the registry (Staging -> Production) -> API loads the Production
-# model from the registry via http://mlflow:5000.
-#
-# The mlflow service runs as root to write to the shared volume; register
-# and api communicate with mlflow via HTTP only (no volume needed).
+# Flow: mlflow server starts -> `train` runs the full pipeline (synthetic data
+# -> preprocess -> train -> evaluate), logging every run to MLflow and
+# registering/promoting the best model (Staging -> Production, alias
+# @production) -> `api` loads the Production model from the registry via
+# http://mlflow:5000, using the shared volumes for the vocabulary and the
+# popularity fallback.
 
 services:
   mlflow:
@@ -31,13 +31,20 @@ services:
       retries: 5
       start_period: 10s
 
-  register:
+  train:
     build:
       context: .
       target: runtime
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
-    command: python scripts/register_model.py
+    command: >
+      sh -c "python scripts/gen_synthetic_data.py &&
+             python -u -m src.pipeline.preprocess &&
+             python -u -m src.pipeline.train &&
+             python -u -m src.pipeline.evaluate"
+    volumes:
+      - models_data:/app/models
+      - processed_data:/app/data/processed
     depends_on:
       mlflow:
         condition: service_healthy
@@ -52,8 +59,11 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_SOURCE: registry
+    volumes:
+      - models_data:/app/models
+      - processed_data:/app/data/processed
     depends_on:
-      register:
+      train:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/status')"]
@@ -64,3 +74,5 @@ services:
 
 volumes:
   mlflow_data:
+  models_data:
+  processed_data:
