@@ -2,8 +2,9 @@
 # Cria o provedor OIDC do GitHub Actions + a IAM Role que o deploy-api assume.
 # Sem chaves estáticas na AWS. Idempotente — já foi aplicado nesta conta.
 #
-# A role recebe o MÍNIMO necessário para o deploy da API:
+# A role recebe o MÍNIMO necessário para o deploy da API e o DVC:
 #   - IAM: eks:DescribeCluster apenas no cluster alvo (para o update-kubeconfig);
+#   - IAM: leitura/escrita S3 restrita ao prefixo dvc/ do bucket de modelos;
 #   - EKS: access entry com AmazonEKSEditPolicy ESCOPADA ao namespace `models`.
 # O cluster é compartilhado: a role não deve poder tocar em kube-system nem em
 # outros namespaces.
@@ -17,6 +18,7 @@ ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --ou
 CLUSTER="${EKS_CLUSTER:-arcobridgegitops}"
 NAMESPACE="${EKS_NAMESPACE:-models}"
 ROLE_NAME="${OIDC_ROLE_NAME:-github-actions-recsys-api}"
+BUCKET="${MODELS_BUCKET:-arcobridgegitops-models-${ACCOUNT_ID}}"
 : "${GITHUB_REPO:?Defina GITHUB_REPO=org/repositorio}"
 
 OIDC_HOST="token.actions.githubusercontent.com"
@@ -77,6 +79,32 @@ fi
 
 aws iam put-role-policy --role-name "$ROLE_NAME" \
   --policy-name "eks-describe-${CLUSTER}" --policy-document "$POLICY"
+
+# Remote DVC: leitura/escrita restritas ao prefixo dvc/ do bucket de modelos.
+S3_POLICY="$(cat <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListDvcPrefix",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::${BUCKET}",
+      "Condition": { "StringLike": { "s3:prefix": ["dvc/*", "dvc"] } }
+    },
+    {
+      "Sid": "ReadWriteDvcObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": "arn:aws:s3:::${BUCKET}/dvc/*"
+    }
+  ]
+}
+EOF
+)"
+
+aws iam put-role-policy --role-name "$ROLE_NAME" \
+  --policy-name "dvc-s3-${BUCKET}" --policy-document "$S3_POLICY"
 
 echo ">> Garantindo access entry no cluster $CLUSTER (escopo: ns/$NAMESPACE)..."
 if ! aws eks describe-access-entry --cluster-name "$CLUSTER" --region "$REGION" \

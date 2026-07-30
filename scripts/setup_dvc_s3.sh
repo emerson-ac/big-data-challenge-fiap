@@ -9,7 +9,7 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
 ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
-BUCKET="${MODELS_BUCKET:-recsys-challenge-models-${ACCOUNT_ID}}"
+BUCKET="${MODELS_BUCKET:-arcobridgegitops-models-${ACCOUNT_ID}}"
 DVC_URL="s3://${BUCKET}/dvc"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
