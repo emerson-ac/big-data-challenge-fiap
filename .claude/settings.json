@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "matcher": "api-smoke-test",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[hook] api-smoke-test concluído em '$(date '+%Y-%m-%d %H:%M:%S')"
+          }
+        ]
+      }
+    ]
+  }
+}
