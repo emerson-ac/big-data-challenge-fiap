@@ -65,6 +65,15 @@ jobs:
       - name: Publicar artefatos atualizados no S3 (DVC)
         run: uv run dvc push -r s3remote
 
+      # O dvc push grava em formato content-addressed (dvc/files/md5/...), que o
+      # initContainer da API nao sabe ler. Este step publica os mesmos artefatos
+      # no layout legivel esperado por k8s/api/deployment.yaml. Sem ele o pod
+      # sobe, encontra o prefixo vazio e falha no sync.
+      - name: Publicar artefatos no layout consumido pela API
+        env:
+          MODELS_BUCKET: arcobridgegitops-models-177300752486
+        run: bash scripts/publish_api_artifacts.sh
+
       - name: Resumo de métricas
         run: |
           echo "## Comparação de modelos" >> $GITHUB_STEP_SUMMARY
