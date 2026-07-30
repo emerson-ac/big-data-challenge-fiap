@@ -121,11 +121,19 @@ def _model_row(recs, gt, n_items, k, model_dir, patterns, lat) -> dict:
     return _row(recs, gt, n_items, k, _dir_size_mb(model_dir, patterns), lat)
 
 
+_USER_CF_SAMPLE = 3000
+
+
 def _prep(interactions, gt) -> tuple:
-    """Returns (n_items, users, sample) for the test-split evaluation."""
+    """Returns (n_items, users, sample) for the test-split evaluation.
+
+    ``user_based_cf`` is the only model evaluated on the sample: scoring it for
+    every test user means a KNN query per user against the neighbour pool. The
+    sample keeps the stage tractable — the model card records the caveat.
+    """
     n_items = interactions.shape[1]
     users = list(gt.keys())
-    return n_items, users, users[: min(3000, len(users))]
+    return n_items, users, users[: min(_USER_CF_SAMPLE, len(users))]
 
 
 def _add_row(rows, name, recs_fn, gt, ctx):
@@ -160,25 +168,59 @@ def _collect_rows(models_dir, interactions, gt, k) -> dict:
     return rows
 
 
+def _card_context(df: pd.DataFrame, best: str, meta: dict, n_users: int) -> dict:
+    """Assembles the numbers that feed the limitations/biases sections.
+
+    Args:
+        df: Comparison table indexed by model.
+        best: Name of the promoted model.
+        meta: Contents of ``split_meta.json``.
+        n_users: Number of users in the interaction matrix.
+
+    Returns:
+        Mapping of template placeholders to formatted values.
+    """
+    catalog_pct = df.loc[best, "coverage_at_k"] * 100
+    return {
+        "top_n": meta["top_n_products"],
+        "n_items": meta["n_items_catalog"],
+        "volume_pct": round(meta["catalog_coverage"] * 100, 1),
+        "n_users": n_users,
+        "test_pct": round(meta["test_ratio"] * 100, 1),
+        "catalog_pct": round(catalog_pct, 1),
+        "unseen_pct": round(100 - catalog_pct, 1),
+        "sample_size": _USER_CF_SAMPLE,
+    }
+
+
 def _write_model_card(
     df: pd.DataFrame,
     best: str,
-    dataset_hash: str,
+    data,
     out: Path,
     registered_name: str,
 ) -> None:
-    """Generates MODEL_CARD.md from the comparison table."""
+    """Generates MODEL_CARD.md from the comparison table.
+
+    Args:
+        df: Comparison table indexed by model.
+        best: Name of the promoted model.
+        data: Processed artifacts (for split metadata and matrix shape).
+        out: Destination path of the model card.
+        registered_name: Name used in the MLflow Model Registry.
+    """
     beats_recall = bool(
         df.loc["ncf", "recall_at_k"] > df.drop("ncf")["recall_at_k"].max()
     )
     beats_ndcg = bool(df.loc["ncf", "ndcg_at_k"] > df.drop("ncf")["ndcg_at_k"].max())
     card = _MODEL_CARD_TEMPLATE.format(
-        hash=dataset_hash[:16],
+        hash=data.split_meta["dataset_hash"][:16],
         table=df.round(4).to_markdown(),
         beats_recall=beats_recall,
         beats_ndcg=beats_ndcg,
         best=best,
         registered_name=registered_name,
+        **_card_context(df, best, data.split_meta, data.interactions.shape[0]),
     )
     out.write_text(card, encoding="utf-8")
 
@@ -236,13 +278,7 @@ def _save_artifacts(df, best, data, models_dir, registered_name) -> None:
     eval_dir = models_dir / "evaluation"
     eval_dir.mkdir(parents=True, exist_ok=True)
     df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
-    _write_model_card(
-        df,
-        best,
-        data.split_meta["dataset_hash"],
-        models_dir / "MODEL_CARD.md",
-        registered_name,
-    )
+    _write_model_card(df, best, data, models_dir / "MODEL_CARD.md", registered_name)
 
 
 def main() -> None:
@@ -265,6 +301,13 @@ _MODEL_CARD_TEMPLATE = """# Model Card - Sistema de Recomendacao Instacart
 
 Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash}...`.
 
+## Dados e escopo
+
+- Catalogo restrito aos **{top_n} produtos mais comprados** ({n_items} itens),
+  cobrindo {volume_pct}% do volume de interacoes.
+- {n_users} usuarios com pedido rotulado; {test_pct}% deles no split de teste.
+- Sinal binario implicito (comprou / nao comprou), sem quantidade nem rating.
+
 ## Metricas (split de teste)
 
 {table}
@@ -276,6 +319,38 @@ Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash
 - Modelo com melhor recall@k: **{best}**
 - `{registered_name}` (pyfunc servindo **{best}**) promovido via stages
   Staging -> Production e alias **@production** no MLflow Model Registry.
+
+## Limitacoes
+
+- **Cauda longa fora do catalogo.** Produtos fora do top-{top_n} nunca sao
+  recomendaveis: o modelo nao tem representacao para eles.
+- **Cold-start nao e resolvido pelo modelo.** Usuario sem historico cai no
+  fallback de popularidade (`src/models/inference.py`), que ignora preferencia
+  individual. Item novo no catalogo tambem nao tem vizinhos nem embedding treinado.
+- **Split por usuario, nao temporal.** Treino e teste dividem usuarios, nao
+  periodos. As metricas nao medem degradacao ao longo do tempo, que e o cenario
+  real de producao.
+- **`user_based_cf` avaliado em amostra.** Suas metricas vem dos primeiros
+  {sample_size} usuarios do split (menores indices), enquanto os outros 4 modelos
+  usam o split completo. A linha nao e diretamente comparavel as demais, e
+  `coverage_at_k` e a mais afetada (menos usuarios, mesmo denominador de catalogo).
+- **Sem features de conteudo.** Nome, corredor e departamento do produto nao
+  entram em nenhum modelo — apenas o padrao de co-ocorrencia de compras.
+
+## Vieses conhecidos
+
+- **Vies de popularidade.** O modelo promovido concentra as recomendacoes em
+  {catalog_pct}% do catalogo; os demais {unseen_pct}% nunca aparecem em um top-k.
+  Isso reforca produtos ja populares e reduz a descoberta de nicho.
+- **Vies de recompra.** O ground truth e a proxima cesta do usuario, que no
+  Instacart repete itens ja comprados. Modelos que apenas reproduzem o historico
+  sao premiados pelas metricas, ainda que nao gerem descoberta.
+- **Vies de volume de compra.** A estratificacao do split usa faixas de numero de
+  pedidos (ocasional / regular / super_user). Usuarios com pouco historico tem
+  vetor esparso e recebem recomendacao de qualidade inferior.
+- **Vies de selecao do catalogo.** O corte por popularidade e calculado sobre o
+  historico completo, o que favorece categorias de compra frequente (ex: hortifruti
+  e laticinios) sobre categorias sazonais.
 
 Gerado automaticamente por `src/pipeline/evaluate.py`.
 """
