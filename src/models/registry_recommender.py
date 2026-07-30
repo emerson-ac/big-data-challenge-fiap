@@ -42,6 +42,15 @@ class RegistryRecommender:
         logger.info("registry_model_loaded", uri=uri)
         return cls(model.unwrap_python_model())
 
+    @property
+    def model_type(self) -> str | None:
+        """Base model type actually served by the promoted pyfunc.
+
+        Read from the unwrapped ``RecommenderPyfunc`` (e.g. ``popularity``),
+        so the API can report the real model instead of a hardcoded name.
+        """
+        return getattr(self._impl, "_model_type", None)
+
     def score_user(self, user_idx: int) -> np.ndarray:
         """Computes the dense per-item score vector for a known user.
 

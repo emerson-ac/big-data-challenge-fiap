@@ -28,3 +28,16 @@ def test_load_round_trips_ranking_from_disk(model_artifacts: dict) -> None:
     model = PopularityRecommender.load(model_artifacts["popularity_path"])
 
     assert model.top_k(2) == [3, 2]
+
+
+def test_score_user_ranks_items_by_popularity(
+    toy_popularity_ranking: np.ndarray,
+) -> None:
+    """score_user gives the most popular item the highest (user-agnostic) score."""
+    model = PopularityRecommender(toy_popularity_ranking)
+
+    scores = model.score_user(user_idx=0)
+
+    # ranking [3, 2, 1, 0] -> item 3 most popular; scores indexed by item_idx.
+    assert np.array_equal(scores, np.array([1, 2, 3, 4], dtype=np.float32))
+    assert int(scores.argmax()) == 3

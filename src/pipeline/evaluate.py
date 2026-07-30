@@ -24,6 +24,7 @@ from src.evaluation.metrics import (
     evaluate_recommendations,
     hit_rate_at_k,
 )
+from src.evaluation.promotion import select_promoted_model
 from src.evaluation.ranking import recommendations_from_score_matrix
 from src.models.ncf import NeuralCollaborativeFiltering, score_all_items
 from src.models.training.data import load_processed
@@ -255,7 +256,7 @@ def main() -> None:
     data = load_processed(settings.processed_data_dir)
     rows = _collect_rows(models_dir, data.interactions, data.test_ground_truth, k)
     df = pd.DataFrame(rows).T.rename_axis("model")
-    best = str(df["recall_at_k"].idxmax())
+    best = select_promoted_model(df)
     _save_artifacts(df, best, data, models_dir, settings.registered_model_name)
     _register(df, best, data.split_meta["dataset_hash"], settings)
     logger.info("evaluation_done", best_model=best)
