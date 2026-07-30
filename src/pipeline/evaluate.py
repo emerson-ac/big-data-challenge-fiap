@@ -181,15 +181,19 @@ def _collect_rows(models_dir, interactions, users, full_gt, k) -> dict:
     return rows
 
 
+def _ncf_verdict(beats_recall: bool, beats_ndcg: bool) -> str:
+    """One-line verdict on how the NCF compared to the CF baselines."""
+    if beats_recall and beats_ndcg:
+        return "superou os baselines de CF em recall@k e ndcg@k"
+    if beats_recall or beats_ndcg:
+        return "superou parcialmente os baselines de CF (ver tabela)"
+    return "nao superou os baselines de CF neste dataset"
+
+
 def _write_model_card(
-    df: pd.DataFrame,
-    best: str,
-    dataset_hash: str,
-    out: Path,
-    registered_name: str,
-    n_eval: int,
+    df: pd.DataFrame, dataset_hash: str, out: Path, ctx: dict
 ) -> None:
-    """Generates MODEL_CARD.md from the comparison table."""
+    """Generates MODEL_CARD.md (performance, limitations and biases)."""
     beats_recall = bool(
         df.loc["ncf", "recall_at_k"] > df.drop("ncf")["recall_at_k"].max()
     )
@@ -199,9 +203,13 @@ def _write_model_card(
         table=df.round(4).to_markdown(),
         beats_recall=beats_recall,
         beats_ndcg=beats_ndcg,
-        best=best,
-        registered_name=registered_name,
-        n_eval=n_eval,
+        ncf_verdict=_ncf_verdict(beats_recall, beats_ndcg),
+        best=ctx["best"],
+        best_cov=round(float(df.loc[ctx["best"], "coverage_at_k"]), 4),
+        registered_name=ctx["registered_name"],
+        n_eval=ctx["n_eval"],
+        k=ctx["k"],
+        top_n=ctx["top_n"],
     )
     out.write_text(card, encoding="utf-8")
 
@@ -254,18 +262,24 @@ def _promote(name: str, version: str, alias: str) -> None:
     )
 
 
-def _save_artifacts(df, best, data, models_dir, registered_name, n_eval) -> None:
+def _card_context(settings, config, best: str, n_eval: int) -> dict:
+    """Assembles the dynamic values injected into the MODEL_CARD."""
+    return {
+        "registered_name": settings.registered_model_name,
+        "best": best,
+        "n_eval": n_eval,
+        "k": config["evaluation"]["k"],
+        "top_n": config["preprocessing"]["top_n_products"],
+    }
+
+
+def _save_artifacts(df, data, models_dir, ctx) -> None:
     """Writes the comparison CSV and the dynamic MODEL_CARD."""
     eval_dir = models_dir / "evaluation"
     eval_dir.mkdir(parents=True, exist_ok=True)
     df.round(4).to_csv(eval_dir / "metrics_comparison.csv")
     _write_model_card(
-        df,
-        best,
-        data.split_meta["dataset_hash"],
-        models_dir / "MODEL_CARD.md",
-        registered_name,
-        n_eval,
+        df, data.split_meta["dataset_hash"], models_dir / "MODEL_CARD.md", ctx
     )
 
 
@@ -284,21 +298,21 @@ def main() -> None:
     rows = _collect_rows(models_dir, data.interactions, eval_users, gt, k)
     df = pd.DataFrame(rows).T.rename_axis("model")
     best = select_promoted_model(df)
-    _save_artifacts(df, best, data, models_dir, settings.registered_model_name, n_eval)
+    _save_artifacts(df, data, models_dir, _card_context(settings, config, best, n_eval))
     _register(df, best, data.split_meta["dataset_hash"], settings)
     logger.info("evaluation_done", best_model=best, eval_users=n_eval)
 
 
 _MODEL_CARD_TEMPLATE = """# Model Card - Sistema de Recomendacao Instacart
 
-Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash}...`.
+Comparacao de 5 modelos (top-{k}) no split de teste interno. Dataset hash: `{hash}...`.
 
 Todos os modelos foram avaliados sobre a **mesma** populacao: {n_eval} usuarios do
 split de teste (amostra uniforme com seed 42 quando o teste excede o teto
 `evaluation.sample_size`). Isso garante que as metricas e o `coverage_at_k` sejam
 diretamente comparaveis entre modelos.
 
-## Metricas (split de teste)
+## Performance (split de teste)
 
 {table}
 
@@ -309,6 +323,33 @@ diretamente comparaveis entre modelos.
 - Modelo com melhor recall@k: **{best}**
 - `{registered_name}` (pyfunc servindo **{best}**) promovido via stages
   Staging -> Production e alias **@production** no MLflow Model Registry.
+
+## Limitacoes
+
+- **Avaliacao offline**: metricas medidas em split historico; sem teste online/A-B,
+  entao exposicao, novidade e satisfacao real nao sao capturadas.
+- **Feedback implicito**: o ground truth sao itens comprados no periodo de teste;
+  ausencia de compra nao significa irrelevancia, o que subestima itens nunca expostos.
+- **Cold-start**: usuarios ou itens sem historico caem no fallback de popularidade,
+  sem personalizacao.
+- **NCF** (modelo principal em PyTorch) {ncf_verdict}; o trade-off e documentado, mas
+  o melhor modelo por recall@k e promovido conforme o edital.
+- **Catalogo restrito** aos {top_n} produtos mais comprados: itens de cauda longa
+  ficam fora da avaliacao e do serving.
+- **Variancia amostral**: quando o teste excede o teto, as metricas vem de uma amostra
+  de {n_eval} usuarios e carregam incerteza estatistica.
+
+## Possiveis Vieses
+
+- **Vies de popularidade**: o promovido (**{best}**) tem coverage@{k} = {best_cov};
+  cobertura baixa concentra recomendacoes em itens ja populares (efeito "rico fica
+  mais rico" / filter bubble) e reduz diversidade e descoberta.
+- **Vies de recompra** do Instacart: usuarios reabastecem os mesmos produtos,
+  favorecendo modelos que exploram o historico (item-based CF) e penalizando novidade.
+- **Vies de selecao**: o recorte de catalogo top-{top_n} e o split por usuario favorecem
+  itens e usuarios mais ativos; quem tem pouco historico e sub-representado.
+- **Dados sinteticos**: quando usados no lugar do Kaggle real, nao reproduzem o vies de
+  recompra e os resultados nao transferem diretamente.
 
 Gerado automaticamente por `src/pipeline/evaluate.py`.
 """
