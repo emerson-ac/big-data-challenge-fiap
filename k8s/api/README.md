@@ -3,14 +3,21 @@
 Deploy da **API REST de recomendação** (`src/api/main.py`, FastAPI/uvicorn) como
 um Deployment Kubernetes nativo — **Deployment + Service + Ingress (ALB) + HPA**.
 
-## O que é provisionado
+## Pré-requisitos (já existentes no cluster)
 
-| Recurso | Origem |
+O deploy usa o cluster **`arcobridgegitops`** (us-east-1), compartilhado e
+pré-existente. Este projeto **não** provisiona cluster nem addons de
+plataforma — apenas aplica os objetos da API no namespace `models`.
+
+| Recurso | Estado |
 |---|---|
-| Cluster EKS `recsys-challenge` | `cluster/cluster.yaml` (eksctl) |
-| Namespace `models` + SA `sa-model-s3` (IRSA, S3 read-only) | `cluster/cluster.yaml` |
-| AWS Load Balancer Controller (Ingress `alb`) | `scripts/deploy.sh` |
-| metrics-server (para o HPA) | addon em `cluster/cluster.yaml` |
+| Cluster EKS `arcobridgegitops` | pré-existente |
+| Namespace `models` + SA `sa-model-s3` (IRSA, S3 read-only) | pré-existentes |
+| AWS Load Balancer Controller (Ingress `alb`) | já instalado em `kube-system` |
+| metrics-server (para o HPA) | já instalado |
+
+> Não rode `helm upgrade` do LB Controller neste cluster: ele atende os
+> Ingress de todos os namespaces, inclusive de produção.
 
 ## Artefatos via S3 (não embutidos na imagem)
 
@@ -31,8 +38,8 @@ s3://<bucket>/recsys-api/data/processed/interactions_prior.npz
 ## Como publicar
 
 ```bash
-# 0. Pré-requisitos: cluster provisionado (bash scripts/bootstrap.sh)
-#    + plataforma instalada (bash scripts/deploy.sh step 1).
+# 0. Pré-requisito: acesso ao cluster arcobridgegitops
+#    aws eks update-kubeconfig --name arcobridgegitops --region us-east-1
 
 # 1. Gere os artefatos (com dados reais em data/raw/)
 uv run dvc repro

@@ -1,5 +1,5 @@
-# Autoscaling horizontal por CPU (o metrics-server é instalado como addon
-# do cluster — ver cluster/cluster.yaml).
+# Autoscaling horizontal por CPU (o metrics-server já está instalado no
+# cluster arcobridgegitops).
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
