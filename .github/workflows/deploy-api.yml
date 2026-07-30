@@ -75,18 +75,21 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - uses: azure/setup-kubectl@v4
+      - uses: imranismail/setup-kustomize@v2
 
       - name: Atualizar kubeconfig
         run: aws eks update-kubeconfig --name "$CLUSTER" --region "$AWS_REGION"
 
-      - name: Aplicar manifests (Service/Ingress/HPA/Deployment)
-        run: kubectl apply -k k8s/api
-
-      - name: Atualizar imagem e aguardar rollout
+      # A imagem entra via kustomize ANTES do apply. Aplicar o manifest com o
+      # placeholder e so depois corrigir com `set image` criava uma revisao
+      # intermediaria invalida — e era para ela que o rollback voltava.
+      - name: Aplicar manifests com a imagem do build
         id: rollout
         run: |
-          kubectl -n "$NAMESPACE" set image \
-            deployment/"$DEPLOYMENT" api=${{ steps.img.outputs.tag }}
+          cd k8s/api
+          kustomize edit set image REGISTRY/recsys-api=${{ steps.img.outputs.tag }}
+          cd -
+          kubectl apply -k k8s/api
           kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT" --timeout=300s
 
       - name: URL pública (ALB) — best-effort
