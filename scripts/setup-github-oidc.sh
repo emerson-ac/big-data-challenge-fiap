@@ -4,7 +4,8 @@
 #
 # A role recebe o MÍNIMO necessário para o deploy da API e o DVC:
 #   - IAM: eks:DescribeCluster apenas no cluster alvo (para o update-kubeconfig);
-#   - IAM: leitura/escrita S3 restrita ao prefixo dvc/ do bucket de modelos;
+#   - IAM: leitura/escrita S3 restrita aos prefixos dvc/ e recsys-api/ do
+#     bucket de modelos (o segundo e o layout que o initContainer da API le);
 #   - EKS: access entry com AmazonEKSEditPolicy ESCOPADA ao namespace `models`.
 # O cluster é compartilhado: a role não deve poder tocar em kube-system nem em
 # outros namespaces.
@@ -19,6 +20,7 @@ CLUSTER="${EKS_CLUSTER:-arcobridgegitops}"
 NAMESPACE="${EKS_NAMESPACE:-models}"
 ROLE_NAME="${OIDC_ROLE_NAME:-github-actions-recsys-api}"
 BUCKET="${MODELS_BUCKET:-arcobridgegitops-models-${ACCOUNT_ID}}"
+API_PREFIX="${S3_PREFIX:-recsys-api}"
 : "${GITHUB_REPO:?Defina GITHUB_REPO=org/repositorio}"
 
 OIDC_HOST="token.actions.githubusercontent.com"
@@ -80,22 +82,26 @@ fi
 aws iam put-role-policy --role-name "$ROLE_NAME" \
   --policy-name "eks-describe-${CLUSTER}" --policy-document "$POLICY"
 
-# Remote DVC: leitura/escrita restritas ao prefixo dvc/ do bucket de modelos.
+# S3: dvc/ para o remote do DVC, recsys-api/ para o layout que o initContainer
+# da API consome (publicado por scripts/publish_api_artifacts.sh).
 S3_POLICY="$(cat <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ListBucketForDvc",
+      "Sid": "ListBucketForDvcAndApi",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
       "Resource": "arn:aws:s3:::${BUCKET}"
     },
     {
-      "Sid": "ReadWriteDvcObjects",
+      "Sid": "ReadWriteDvcAndApiObjects",
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject"],
-      "Resource": "arn:aws:s3:::${BUCKET}/dvc/*"
+      "Resource": [
+        "arn:aws:s3:::${BUCKET}/dvc/*",
+        "arn:aws:s3:::${BUCKET}/${API_PREFIX}/*"
+      ]
     }
   ]
 }
