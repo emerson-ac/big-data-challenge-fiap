@@ -166,7 +166,7 @@ não-root, com healthcheck.
 ```bash
 uv run ruff check .                # lint
 uv run ruff format .               # formatação
-uv run pytest -q                   # testes (33 testes)
+uv run pytest -q                   # testes (45 testes)
 uv run pre-commit run --all-files  # todos os hooks
 ```
 
