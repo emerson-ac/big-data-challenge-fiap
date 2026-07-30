@@ -83,7 +83,7 @@ O remote default é o S3 (Aula 3 — Armazenamento Remoto), declarado em
 [`.dvc/config`](.dvc/config):
 
 ```
-s3://<seu-bucket>/dvc   (us-east-1)
+s3://arcobridgegitops-models-177300752486/dvc   (us-east-1)
 ```
 
 ```bash
@@ -322,15 +322,24 @@ ser carregados.
 
 ## Resultados
 
-Os artefatos commitados (`models/`, `data/processed/`) foram gerados com um
-**dataset sintético** para validação rápida do pipeline. Para reproduzir com o
-dataset real do Kaggle, coloque os CSVs em `data/raw/` e rode `uv run dvc repro`.
+O [`dvc.lock`](dvc.lock) commitado está travado no **dataset real do Instacart**
+(`data/raw`, ~713MB, 6 arquivos). Os artefatos (`models/`, `data/processed/`)
+não ficam no git — são gerenciados pelo DVC. Para obter os resultados abaixo:
+
+```bash
+uv run dvc pull                               # baixa data/raw/ + artefatos do S3
+uv run dvc status                             # deve estar "up to date"
+```
+
+Sem acesso ao bucket, `uv run dvc repro` reproduz o pipeline a partir dos CSVs
+do Kaggle em `data/raw/`.
 
 ### Dataset real (Kaggle)
 
 Avaliação no split de teste interno (15% dos usuários; catálogo restrito aos
 3.000 produtos mais comprados). Resultados completos em
-[`models/MODEL_CARD.md`](models/MODEL_CARD.md).
+[`models/MODEL_CARD.md`](models/MODEL_CARD.md) — gerado pelo estágio `evaluate`
+e disponível após `dvc pull` ou `dvc repro`.
 
 O **Item-based CF** liderou em `Recall@10` e `NDCG@10` com alta cobertura e
 baixa latência, sendo promovido a `Production`. A rede neural **NCF**
@@ -338,7 +347,12 @@ baixa latência, sendo promovido a `Production`. A rede neural **NCF**
 search e early stopping, mas não superou os baselines de CF neste dataset —
 análise da causa-raiz em [`docs/NOTEBOOKS.md`](docs/NOTEBOOKS.md) (seção 7.3).
 
-### Dataset sintético (commitado)
+### Dataset sintético (validação rápida)
+
+Alternativa sem acesso ao S3 nem ao Kaggle: `scripts/gen_synthetic_data.py`
+gera um dataset em segundos para validar o pipeline ponta a ponta (ver
+[Dados](#dados)). Os números abaixo referem-se a essa execução, não ao
+`dvc.lock` commitado.
 
 Com o dataset sintético, o baseline de **popularidade** empata com Item-based
 CF em `Recall@10` (ambos ~0,50) e vence em `NDCG@10` por ser mais simples — o
