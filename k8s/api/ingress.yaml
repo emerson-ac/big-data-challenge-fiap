@@ -1,8 +1,6 @@
 # Ingress ALB público para a API de recomendação.
-# O AWS Load Balancer Controller cria um ALB internet-facing a partir daqui.
-#
-# Para HTTPS: descomente as annotations de certificado e ssl-redirect,
-# substituindo o ARN pelo seu certificado ACM.
+# HTTPS com certificado ACM wildcard (*.pocsarcotech.com).
+# HTTP redireciona automaticamente para HTTPS.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -11,15 +9,15 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /health
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
-    # alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/healthcheck-path: /health/status
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:177300752486:certificate/eebc6271-527b-45a6-99b8-b7b888cdbdc2
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
 spec:
   ingressClassName: alb
   rules:
-    - http:
+    - host: techchallenger2.pocsarcotech.com
+      http:
         paths:
           - path: /
             pathType: Prefix
