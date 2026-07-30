@@ -33,9 +33,10 @@ spec:
             - name: AWS_REGION
               value: us-east-1
             - name: MODELS_BUCKET
-              # Bucket de modelos do projeto: arcobridgegitops-models-<account-id>.
-              # Publique os artefatos antes com scripts/publish_api_artifacts.sh.
-              value: REPLACE_WITH_YOUR_BUCKET
+              # Publique os artefatos antes com scripts/publish_api_artifacts.sh:
+              # sem o prefixo S3_PREFIX no bucket, o sync nao traz nada e a API
+              # sobe sem modelo.
+              value: arcobridgegitops-models-177300752486
             - name: S3_PREFIX
               value: recsys-api
           command: ["/bin/sh", "-c"]
@@ -45,6 +46,19 @@ spec:
               echo "Sincronizando artefatos de s3://${MODELS_BUCKET}/${S3_PREFIX}/ ..."
               aws s3 sync "s3://${MODELS_BUCKET}/${S3_PREFIX}/models/" /app/models/ --no-progress
               aws s3 sync "s3://${MODELS_BUCKET}/${S3_PREFIX}/data/processed/" /app/data/processed/ --no-progress
+              # Um prefixo inexistente faz o sync terminar com sucesso e sem
+              # arquivo nenhum. Sem esta checagem o pod so falharia depois, no
+              # startup da API, com um erro bem menos obvio.
+              for f in /app/models/item_based_cf/item_similarity.npz \
+                       /app/models/baseline_popularity/ranking.pkl \
+                       /app/data/processed/vocabularies.pkl \
+                       /app/data/processed/interactions_prior.npz; do
+                if [ ! -f "$f" ]; then
+                  echo "ERRO: artefato ausente apos o sync: $f"
+                  echo "Publique com scripts/publish_api_artifacts.sh (requer dvc repro antes)."
+                  exit 1
+                fi
+              done
               echo "Artefatos baixados:"
               ls -R /app/models /app/data/processed
           volumeMounts:
@@ -65,13 +79,13 @@ spec:
               value: local
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/status
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/status
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20
