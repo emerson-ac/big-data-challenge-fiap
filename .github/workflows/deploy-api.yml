@@ -89,6 +89,9 @@ jobs:
           cd k8s/api
           kustomize edit set image REGISTRY/recsys-api=${{ steps.img.outputs.tag }}
           cd -
+          # Substituir placeholders pelos valores reais (não versionados)
+          sed -i "s|REPLACE_WITH_MODELS_BUCKET|${{ vars.MODELS_BUCKET }}|g" k8s/api/deployment.yaml
+          sed -i "s|REPLACE_WITH_ACM_CERTIFICATE_ARN|${{ vars.ACM_CERTIFICATE_ARN }}|g" k8s/api/ingress.yaml
           kubectl apply -k k8s/api
           kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT" --timeout=300s
 

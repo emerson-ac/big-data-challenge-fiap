@@ -35,7 +35,7 @@ spec:
             - name: AWS_REGION
               value: us-east-1
             - name: MODELS_BUCKET
-              value: arcobridgegitops-models-177300752486
+              value: REPLACE_WITH_MODELS_BUCKET
             - name: S3_PREFIX
               value: recsys-api
           command: ["/bin/sh", "-c"]

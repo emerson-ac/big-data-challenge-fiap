@@ -71,7 +71,7 @@ jobs:
       # sobe, encontra o prefixo vazio e falha no sync.
       - name: Publicar artefatos no layout consumido pela API
         env:
-          MODELS_BUCKET: arcobridgegitops-models-177300752486
+          MODELS_BUCKET: ${{ vars.MODELS_BUCKET }}
         run: bash scripts/publish_api_artifacts.sh
 
       - name: Resumo de métricas

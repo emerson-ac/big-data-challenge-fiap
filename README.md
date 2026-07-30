@@ -83,7 +83,7 @@ O remote default é o S3 (Aula 3 — Armazenamento Remoto), declarado em
 [`.dvc/config`](.dvc/config):
 
 ```
-s3://arcobridgegitops-models-177300752486/dvc   (us-east-1)
+s3://<seu-bucket>/dvc   (us-east-1)
 ```
 
 ```bash
