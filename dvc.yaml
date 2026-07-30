@@ -3,7 +3,7 @@
 # Outputs use DVC cache (cache: true, default) — not committed to git.
 stages:
   preprocess:
-    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.preprocess
+    cmd: python -u -m src.pipeline.preprocess
     deps:
       - data/raw
       - src/pipeline/preprocess.py
@@ -19,7 +19,7 @@ stages:
       - data/processed/split_meta.json
 
   train:
-    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.train
+    cmd: python -u -m src.pipeline.train
     deps:
       - data/processed
       - src/pipeline/train.py
@@ -43,7 +43,7 @@ stages:
       - models/neural_network/metrics.json
 
   evaluate:
-    cmd: PYTHONUNBUFFERED=1 python -m src.pipeline.evaluate
+    cmd: python -u -m src.pipeline.evaluate
     deps:
       - src/pipeline/evaluate.py
       - src/models/training/user_cf.py
