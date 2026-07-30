@@ -1,8 +1,10 @@
 # Deployment da API de recomendação (FastAPI/uvicorn) no EKS.
 #
-# Os artefatos do modelo NÃO são embutidos na imagem: um initContainer os baixa
-# de um bucket S3 (aws s3 sync) para volumes emptyDir, montados sobre
-# /app/models e /app/data — os caminhos que src/models/inference.py usa.
+# O modelo principal é carregado do MLflow Model Registry externo
+# (RECSYS_MODEL_SOURCE=registry, alias @production). O initContainer baixa
+# apenas os dois artefatos de runtime que a API ainda precisa em disco:
+#   - vocabularies.pkl  (mapeamento user/produto → índice interno)
+#   - ranking.pkl       (fallback de popularidade para cold-start)
 #
 # Requer (todos pré-existentes no cluster arcobridgegitops):
 #   - namespace `models` e SA `sa-model-s3` (IRSA, S3 read-only);
@@ -33,9 +35,6 @@ spec:
             - name: AWS_REGION
               value: us-east-1
             - name: MODELS_BUCKET
-              # Publique os artefatos antes com scripts/publish_api_artifacts.sh:
-              # sem o prefixo S3_PREFIX no bucket, o sync nao traz nada e a API
-              # sobe sem modelo.
               value: arcobridgegitops-models-177300752486
             - name: S3_PREFIX
               value: recsys-api
@@ -43,51 +42,39 @@ spec:
           args:
             - |
               set -eu
-              echo "Sincronizando artefatos de s3://${MODELS_BUCKET}/${S3_PREFIX}/ ..."
-              aws s3 sync "s3://${MODELS_BUCKET}/${S3_PREFIX}/models/" /app/models/ --no-progress
-              aws s3 sync "s3://${MODELS_BUCKET}/${S3_PREFIX}/data/processed/" /app/data/processed/ --no-progress
-              # Um prefixo inexistente faz o sync terminar com sucesso e sem
-              # arquivo nenhum. Sem esta checagem o pod so falharia depois, no
-              # startup da API, com um erro bem menos obvio.
-              for f in /app/models/item_based_cf/item_similarity.npz \
-                       /app/models/baseline_popularity/ranking.pkl \
-                       /app/data/processed/vocabularies.pkl \
-                       /app/data/processed/interactions_prior.npz; do
-                if [ ! -f "$f" ]; then
-                  echo "ERRO: artefato ausente apos o sync: $f"
-                  echo "Publique com scripts/publish_api_artifacts.sh (requer dvc repro antes)."
-                  exit 1
-                fi
-              done
-              echo "Artefatos baixados:"
-              ls -R /app/models /app/data/processed
+              echo "Baixando vocabulario e fallback de popularidade..."
+              aws s3 cp "s3://${MODELS_BUCKET}/${S3_PREFIX}/data/processed/vocabularies.pkl" \
+                /app/data/processed/vocabularies.pkl --no-progress
+              aws s3 cp "s3://${MODELS_BUCKET}/${S3_PREFIX}/models/baseline_popularity/ranking.pkl" \
+                /app/models/baseline_popularity/ranking.pkl --no-progress
+              echo "Artefatos prontos."
           volumeMounts:
-            - name: models
-              mountPath: /app/models
             - name: data
               mountPath: /app/data
+            - name: models
+              mountPath: /app/models
       containers:
         - name: api
-          # Imagem construída a partir do Dockerfile na raiz (uvicorn :8000).
-          # Publique no seu registry (ECR/GHCR/Docker Hub) e ajuste aqui.
-          image: REGISTRY/recsys-api:latest
+          image: mmacanmunhoz/recsys-api:latest
           ports:
             - name: http
               containerPort: 8000
           env:
             - name: MODEL_SOURCE
-              value: local
+              value: registry
+            - name: MLFLOW_TRACKING_URI
+              value: https://mlflow.pocsarcotech.com
           readinessProbe:
             httpGet:
               path: /health/status
               port: http
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health/status
               port: http
-            initialDelaySeconds: 15
+            initialDelaySeconds: 30
             periodSeconds: 20
           resources:
             requests:
@@ -97,12 +84,12 @@ spec:
               cpu: "1"
               memory: "2Gi"
           volumeMounts:
-            - name: models
-              mountPath: /app/models
             - name: data
               mountPath: /app/data
+            - name: models
+              mountPath: /app/models
       volumes:
-        - name: models
-          emptyDir: {}
         - name: data
+          emptyDir: {}
+        - name: models
           emptyDir: {}
