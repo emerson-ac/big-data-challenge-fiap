@@ -8,6 +8,7 @@ preprocessing:
 
 evaluation:
   k: 10
+  sample_size: 3000  # teto da populacao de avaliacao (amostra uniforme seeded)
 
 item_based_cf:
   search:

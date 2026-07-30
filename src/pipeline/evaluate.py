@@ -122,11 +122,27 @@ def _model_row(recs, gt, n_items, k, model_dir, patterns, lat) -> dict:
     return _row(recs, gt, n_items, k, _dir_size_mb(model_dir, patterns), lat)
 
 
-def _prep(interactions, gt) -> tuple:
-    """Returns (n_items, users, sample) for the test-split evaluation."""
-    n_items = interactions.shape[1]
-    users = list(gt.keys())
-    return n_items, users, users[: min(3000, len(users))]
+def _sample_users(users: list[int], cap: int, seed: int) -> list[int]:
+    """Selects a reproducible, uniform evaluation population.
+
+    Returns all users when the test split fits under the cap; otherwise a
+    seeded random sample (no user_idx bias), shared by every model so the
+    comparison table stays apples-to-apples (same population, same coverage
+    denominator context).
+
+    Args:
+        users: All test-split user indices.
+        cap: Maximum evaluation population size.
+        seed: RNG seed for reproducibility.
+
+    Returns:
+        The evaluation user indices (sorted for determinism).
+    """
+    if len(users) <= cap:
+        return users
+    rng = np.random.default_rng(seed)
+    chosen = rng.choice(len(users), size=cap, replace=False)
+    return [users[i] for i in sorted(chosen)]
 
 
 def _add_row(rows, name, recs_fn, gt, ctx):
@@ -146,16 +162,20 @@ _MODEL_DIRS = {
 }
 
 
-def _collect_rows(models_dir, interactions, gt, k) -> dict:
-    """Rebuilds the 5 models and collects their comparison rows (test split)."""
-    n_items, users, sample = _prep(interactions, gt)
-    sgt = {u: gt[u] for u in sample}
+def _collect_rows(models_dir, interactions, users, full_gt, k) -> dict:
+    """Rebuilds the 5 models and scores them on a single shared population.
+
+    Every model is evaluated on the same ``users`` (and their ground truth),
+    so all metrics — including coverage — are directly comparable.
+    """
+    n_items = interactions.shape[1]
+    gt = {u: full_gt[u] for u in users}
     md, it = models_dir, interactions
     ctx = {"md": md, "n_items": n_items, "k": k}
     rows: dict[str, dict] = {}
     _add_row(rows, "popularity", lambda: _popularity_recs(md, users, k), gt, ctx)
     _add_row(rows, "item_based_cf", lambda: _item_cf_recs(md, it, users, k), gt, ctx)
-    _add_row(rows, "user_based_cf", lambda: _user_cf_recs(md, it, sample, k), sgt, ctx)
+    _add_row(rows, "user_based_cf", lambda: _user_cf_recs(md, it, users, k), gt, ctx)
     _add_row(rows, "matrix_factorization", lambda: _mf_recs(md, users, k), gt, ctx)
     _add_row(rows, "ncf", lambda: _ncf_recs(md, it, users, k), gt, ctx)
     return rows
@@ -167,6 +187,7 @@ def _write_model_card(
     dataset_hash: str,
     out: Path,
     registered_name: str,
+    n_eval: int,
 ) -> None:
     """Generates MODEL_CARD.md from the comparison table."""
     beats_recall = bool(
@@ -180,6 +201,7 @@ def _write_model_card(
         beats_ndcg=beats_ndcg,
         best=best,
         registered_name=registered_name,
+        n_eval=n_eval,
     )
     out.write_text(card, encoding="utf-8")
 
@@ -232,7 +254,7 @@ def _promote(name: str, version: str, alias: str) -> None:
     )
 
 
-def _save_artifacts(df, best, data, models_dir, registered_name) -> None:
+def _save_artifacts(df, best, data, models_dir, registered_name, n_eval) -> None:
     """Writes the comparison CSV and the dynamic MODEL_CARD."""
     eval_dir = models_dir / "evaluation"
     eval_dir.mkdir(parents=True, exist_ok=True)
@@ -243,6 +265,7 @@ def _save_artifacts(df, best, data, models_dir, registered_name) -> None:
         data.split_meta["dataset_hash"],
         models_dir / "MODEL_CARD.md",
         registered_name,
+        n_eval,
     )
 
 
@@ -252,19 +275,28 @@ def main() -> None:
     config = load_config()
     set_seed(settings.random_seed)
     k = config["evaluation"]["k"]
+    cap = config["evaluation"]["sample_size"]
     models_dir = settings.models_dir
     data = load_processed(settings.processed_data_dir)
-    rows = _collect_rows(models_dir, data.interactions, data.test_ground_truth, k)
+    gt = data.test_ground_truth
+    eval_users = _sample_users(list(gt.keys()), cap, settings.random_seed)
+    n_eval = len(eval_users)
+    rows = _collect_rows(models_dir, data.interactions, eval_users, gt, k)
     df = pd.DataFrame(rows).T.rename_axis("model")
     best = select_promoted_model(df)
-    _save_artifacts(df, best, data, models_dir, settings.registered_model_name)
+    _save_artifacts(df, best, data, models_dir, settings.registered_model_name, n_eval)
     _register(df, best, data.split_meta["dataset_hash"], settings)
-    logger.info("evaluation_done", best_model=best)
+    logger.info("evaluation_done", best_model=best, eval_users=n_eval)
 
 
 _MODEL_CARD_TEMPLATE = """# Model Card - Sistema de Recomendacao Instacart
 
 Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash}...`.
+
+Todos os modelos foram avaliados sobre a **mesma** populacao: {n_eval} usuarios do
+split de teste (amostra uniforme com seed 42 quando o teste excede o teto
+`evaluation.sample_size`). Isso garante que as metricas e o `coverage_at_k` sejam
+diretamente comparaveis entre modelos.
 
 ## Metricas (split de teste)
 
