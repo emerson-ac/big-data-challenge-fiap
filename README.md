@@ -115,6 +115,59 @@ dos 5 modelos — o nome do registro não presume o algoritmo vencedor.
 
 ## API REST (FastAPI)
 
+### Ambiente de produção (EKS)
+
+A API está hospedada em produção no Amazon EKS e acessível publicamente em:
+
+| Endpoint | URL |
+|---|---|
+| **Health** | https://techchallenger2.pocsarcotech.com/health/status |
+| **Recomendações** | https://techchallenger2.pocsarcotech.com/recommendations/ |
+| **Swagger UI** | https://techchallenger2.pocsarcotech.com/docs |
+
+Exemplo de requisição em produção:
+
+```bash
+curl -X POST https://techchallenger2.pocsarcotech.com/recommendations/ \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "top_k": 5}'
+```
+
+#### Arquitetura do ambiente
+
+```
+Internet
+   │  HTTPS (443) — certificado ACM wildcard *.pocsarcotech.com
+   ▼
+AWS Application Load Balancer  (internet-facing)
+   │  HTTP interno
+   ▼
+Kubernetes Service (ClusterIP)  — namespace: models
+   │
+   ├── Pod 1 ─── FastAPI/uvicorn :8000
+   └── Pod 2 ─── FastAPI/uvicorn :8000
+         │
+         ├── initContainer: baixa vocabularies.pkl + ranking.pkl do S3
+         └── MODEL_SOURCE=registry → carrega recsys_recommender@production
+                  │
+                  └── MLflow Model Registry (https://mlflow.pocsarcotech.com)
+```
+
+O cluster EKS (`arcobridgegitops`, `us-east-1`) usa subnets privadas com NAT
+Gateway para saída à internet. Os pods assumem uma IAM Role via IRSA
+(`sa-model-s3`) com acesso read-only ao bucket S3 de artefatos. O modelo
+principal é carregado diretamente do MLflow Model Registry externo (alias
+`@production`) no startup — sem artefatos pesados na imagem Docker. Vocabulary
+e fallback de popularidade são os únicos arquivos baixados do S3 via
+`initContainer` a cada deploy.
+
+O CI/CD é gerenciado por dois workflows GitHub Actions:
+- **`model-release`** — retreina o pipeline com dados reais, registra e promove
+  o melhor modelo no MLflow Registry com alias `@production`.
+- **`deploy-api`** — builda a imagem Docker, publica no Docker Hub e faz
+  rollout no EKS via `kubectl`/`kustomize`, com rollback automático em caso de
+  falha.
+
 ### Local
 
 ```bash
@@ -234,10 +287,13 @@ docker-compose.yml        # Orquestração (API + MLflow)
 | Linguagem | Python 3.12+ |
 | Modelagem | PyTorch + Scikit-Learn |
 | API | FastAPI + Uvicorn |
-| Pipeline | DVC (3 estágios, remote local) |
+| Pipeline | DVC (3 estágios, remote S3) |
 | Rastreamento | MLflow Tracking + Model Registry (Staging → Production) |
 | Container | Docker multi-stage + docker-compose |
-| CI | GitHub Actions (ruff, format, lock, pytest) |
+| Orquestração | Amazon EKS (Kubernetes) |
+| Rede | AWS ALB + NAT Gateway + HTTPS (ACM) |
+| DNS | Route 53 — `techchallenger2.pocsarcotech.com` |
+| CI/CD | GitHub Actions (`model-release` + `deploy-api`) |
 | Gerenciador de Deps | uv + pyproject.toml |
 | Linting | Ruff |
 | Logging | Structlog |
