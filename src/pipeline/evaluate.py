@@ -331,8 +331,8 @@ Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash
 
 ## Dados e escopo
 
-- Catalogo restrito aos **{top_n} produtos mais comprados** ({n_items} itens),
-  cobrindo {volume_pct}% do volume de interacoes.
+- Catalogo dos produtos mais comprados: **{n_items} itens** (limite configurado:
+  {top_n}), cobrindo {volume_pct}% do volume de interacoes.
 - {n_users} usuarios com pedido rotulado; {test_pct}% deles no split de teste.
 - Sinal binario implicito (comprou / nao comprou), sem quantidade nem rating.
 
@@ -350,8 +350,8 @@ Comparacao de 5 modelos (top-10) no split de teste interno. Dataset hash: `{hash
 
 ## Limitacoes
 
-- **Cauda longa fora do catalogo.** Produtos fora do top-{top_n} nunca sao
-  recomendaveis: o modelo nao tem representacao para eles.
+- **Cauda longa fora do catalogo.** Produtos fora dos {n_items} itens do catalogo
+  nunca sao recomendaveis: o modelo nao tem representacao para eles.
 - **Cold-start nao e resolvido pelo modelo.** Usuario sem historico cai no
   fallback de popularidade (`src/models/inference.py`), que ignora preferencia
   individual. Item novo no catalogo tambem nao tem vizinhos nem embedding treinado.
